@@ -1,10 +1,16 @@
 Programs included in bin\ (free and open source, unchanged copies):
 
-- SumatraPDF 3.6.1 (bin\SumatraPDF) - GPL v3. https://www.sumatrapdfreader.org
+- SumatraPDF 3.6.1 (bin\SumatraPDF) - GPL v3, see licenses\GPL-3.0.txt.
+  https://www.sumatrapdfreader.org
+  Source code: https://github.com/sumatrapdfreader/sumatrapdf (tag 3.6.1rel)
   Used to print PDFs silently to a named printer.
 
-- Poppler 25.07.0 tools (bin\poppler) - GPL v2/v3. https://poppler.freedesktop.org
-  Windows build from https://github.com/oschwartz10612/poppler-windows
+- Poppler 25.07.0 tools (bin\poppler) - GPL v2 or v3, see licenses\GPL-2.0.txt and licenses\GPL-3.0.txt.
+  https://poppler.freedesktop.org
+  Windows build from https://github.com/oschwartz10612/poppler-windows (release 25.07.0-0)
+  Source code: https://poppler.freedesktop.org/poppler-25.07.0.tar.xz
   Only pdftotext is used, to spot the word "Pallet" on labels.
+
+These programs come with no warranty; see the licence texts.
 
 pdf-lib (..\lib\pdf-lib.min.js) - MIT licence, see ..\lib\pdf-lib-LICENSE.md
