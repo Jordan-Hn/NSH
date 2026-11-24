@@ -993,7 +993,18 @@
       say("Billing: opening the invoice...");
       const w = await openPage(ifUrl, "the item fulfilment", slot);
       const bill = button(w, "Bill");
-      if (!bill) throw step(notBilled, "no Bill button on the item fulfilment");
+      if (!bill) {
+        // Nothing to bill on this order (no Bill button, e.g. a replacement on a cash sale):
+        // print its packing slip instead and finish it, not billed (25/11/2026).
+        if (!d.paper) {
+          say("No Bill button: getting the packing slip...");
+          queuePrint(p, { bytes: await fetchPdf(packingSlipUrl(p.rec.id, ifId)), name: "PackingSlip_" + p.row.so + ".pdf" });
+          d.paper = true;
+        }
+        p.noBill = true;
+        getFrame(slot).src = "about:blank";
+        return "done";
+      }
       // The Bill button goes to custinvc.nl?...transform=salesord&itemship=<IF>. Open that
       // in a pop-up window, not the hidden frame: NetSuite's invoice set-up script crashes
       // inside a frame (NLDropdown, 23/11/2026), so its Save would never work there.
@@ -1505,7 +1516,7 @@
         p.result = await runOrder(p, dry, say, slot);
         p.note = p.result === "dry"
           ? "Dry run OK: " + p.dryResult.status + ", " + p.dryResult.method + (p.dryResult.carrier ? " (" + p.dryResult.carrier + ")" : "") + ", " + p.dryResult.packages + " packages, " + p.dryResult.weight + " kg. Not saved."
-          : "Done" + (p.listAfter ? ", now " + p.listAfter : "");
+          : "Done" + (p.noBill ? ", not billed (no Bill button on the order), packing slip printed" : "") + (p.listAfter ? ", now " + p.listAfter : "");
         if (p.fixedState) p.note += " (address fixed: " + p.fixedState + ")";
       } catch (err) {
         p.result = "failed";
@@ -1540,7 +1551,7 @@
     after.innerHTML =
       (later.length
         ? '<p><b>Still to do:</b></p><table class="nsh-wave-table"><tr><th>Order</th><th>Connote</th><th>Invoice</th><th></th></tr>' +
-          later.map((p) => "<tr><td>" + orderLink(p) + "</td><td>" + copyable(p.connote) + "</td><td>" + copyable(p.invoice.tranid) + "</td><td>" + esc(p.listAfter) + "</td></tr>").join("") + "</table>"
+          later.map((p) => "<tr><td>" + orderLink(p) + "</td><td>" + copyable(p.connote) + "</td><td>" + copyable(p.invoice && p.invoice.tranid) + "</td><td>" + esc(p.listAfter) + "</td></tr>").join("") + "</table>"
         : "") +
       (!dry && done.length
         ? '<label class="nsh-label" for="nsh-ship-out">Paste back over the same rows in the tracker</label><textarea id="nsh-ship-out" rows="5" readonly></textarea>'
