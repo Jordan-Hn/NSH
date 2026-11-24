@@ -151,7 +151,14 @@ try {
     Write-UpdateLog ("Updated to $remote (" + ($changed.Count + 1) + ' files)')
 
     # AutoPrint's own files changed: restart it (Restart.ps1 keeps this PC's printers).
-    if ($changed | Where-Object { $_ -like 'autoprint\*' }) {
+    # Only restart the AutoPrint that runs from THIS folder (a stray or test copy must never
+    # take over the PC's real AutoPrint, its start-up shortcut or the browser link).
+    $mine = Join-Path $here 'AutoPrint.ps1'
+    $runningHere = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($mine, [StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count
+    if (($changed | Where-Object { $_ -like 'autoprint\*' }) -and -not $runningHere) {
+        Write-UpdateLog 'AutoPrint files changed, but AutoPrint isn''t running from this folder: not restarting it'
+    } elseif ($changed | Where-Object { $_ -like 'autoprint\*' }) {
         Write-UpdateLog 'Restarting AutoPrint for its new files'
         $ps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
         Start-Process -FilePath $ps -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$(Join-Path $here 'Restart.ps1')`"") -WindowStyle Hidden
