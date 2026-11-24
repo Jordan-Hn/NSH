@@ -1,1 +1,1 @@
-﻿NetSuite Helper 0.21.6, built 25/11/2026 08:11
+﻿NetSuite Helper 0.21.7, built 25/11/2026 08:28

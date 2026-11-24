@@ -28,6 +28,7 @@
     FW_SMALL: { id: "74678", name: "Freeway Courier <25kg Standard" },
     FW_BIG: { id: "74679", name: "Freeway 1/2 Tonne < 500kg Standard" },
     PICKUP: { id: "28953", name: "Click & Collect" },
+    CUSTOM: { id: "6410", name: "Custom" }, // store orders with no packages: just pushed (Shipped, no courier)
   };
   // Ready Freight package types (customrecordrsc_freight_packagetype).
   const PKG = { CTN: { type: "7", name: "Tall Large", kg: 4 }, PLT: { type: "101", name: "Pallet", kg: 250 } };
@@ -238,6 +239,7 @@
         const w = r.getValue("tranid");
         if (o && /^\d+$/.test(w) && Number(w) > Number(info[o].wave || 0)) {
           info[o].wave = w;
+          info[o].waveId = r.getId();
           info[o].waveStatus = r.getText("statusref") || r.getValue("statusref") || "";
         }
       });
@@ -254,10 +256,16 @@
       if (row.dupe) return out("skip", "Listed twice (done once)");
       if (!rec) return out("flag", row.isTO ? "No transfer order with this number" : "No sales order with this number");
       if (row.connote) return out("skip", "Has a connote already (shipped)");
-      if (!row.ctn && !row.plt) return out("skip", "No PLT/CTN (not picked yet)");
+      // A store order with no PLT/CTN (the store's other TOs in the delivery): pushed, i.e.
+      // Shipped with method Custom and saved, so the store gets its paperwork. No packages,
+      // labels or connote (retail SOP 3; 25/11/2026).
+      if (!row.ctn && !row.plt && row.isTO) {
+        p.push = true;
+        p.method = METHOD.CUSTOM;
+      } else if (!row.ctn && !row.plt) return out("skip", "No PLT/CTN (not picked yet)");
       if (!row.isTO && !sameCustomer(row.customer, rec.customer)) p.warn.push("Customer in NetSuite is " + rec.customer);
-      if (row.isTO && !row.delivery) return out("flag", "No DELIVERY date in the row (Ready Freight needs it)");
-      if (row.isTO && !toDate(row.delivery)) return out("flag", "DELIVERY date " + row.delivery + " not understood");
+      if (row.isTO && !p.push && !row.delivery) return out("flag", "No DELIVERY date in the row (Ready Freight needs it)");
+      if (row.isTO && !p.push && !toDate(row.delivery)) return out("flag", "DELIVERY date " + row.delivery + " not understood");
       if (row.state === "MULTIDROP") return out("flag", "MULTIDROP: do it by hand");
       if (!row.courier) return out("flag", "Courier not recognised");
       if (row.courier === "FW" && row.plt) return out("flag", "Freeway on a pallet: pick the method by hand");
@@ -268,12 +276,20 @@
       if (fam && fam !== courierFamily(row.courier)) return out("flag", "Order's Ship Via is " + rec.shipVia + ", tracker says " + row.courier);
       const open = rec.ifs.filter((f) => f.statusRef !== "shipped");
       if (rec.ifs.length > 1) return out("flag", "Two item fulfilments, do it by hand");
-      if (!rec.ifs.length && rec.wave) return out("flag", "Wave " + rec.wave + " but no item fulfilment, check it");
-      if (!rec.ifs.length) return out("skip", "No wave or item fulfilment (not picked yet)");
-      if (!open.length) {
+      // Store orders only (retail SOP 3): a wave that isn't Complete, or a wave with no item
+      // fulfilment yet, gets its Ready pick tasks marked Done first (25/11/2026). SOs: flagged.
+      if (!rec.ifs.length && rec.wave) {
+        if (!row.isTO) return out("flag", "Wave " + rec.wave + " but no item fulfilment, check it");
+        p.finishWave = true;
+        p.warn.push("Wave " + rec.wave + " has no item fulfilment yet: its Ready pick tasks get marked Done first");
+      }
+      if (!rec.ifs.length && !rec.wave) return out("skip", "No wave or item fulfilment (not picked yet)");
+      if (rec.ifs.length && !open.length) {
         // Shipped but stuck on Aus Post Express (state problem) and not billed: carry on and fix it.
         const f = rec.ifs[0];
-        if (row.isTO && f.consid) {
+        if (p.push) {
+          return out("skip", "Item fulfilment already Shipped (pushed)");
+        } else if (row.isTO && f.consid) {
           return out("skip", "Item fulfilment already Shipped with connote " + f.consid + " (check the tracker)");
         } else if (!rec.invoices.length && !f.consid && row.courier !== "PICKUP") {
           // (a voided consignment leaves the old carrier name behind, so check the connote first)
@@ -290,7 +306,11 @@
       }
       // Fulfilment location doesn't matter (e.g. Warehouses : Online) as long as the wave is Complete (23/11/2026).
       if (rec.invoices.length) return out("flag", "Already has an invoice (" + rec.invoices[0].tranid + "), do it by hand");
-      if (rec.wave && !/complete/i.test(rec.waveStatus)) return out("flag", "Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ", not Complete");
+      if (rec.wave && !/complete/i.test(rec.waveStatus)) {
+        if (!row.isTO) return out("flag", "Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ", not Complete");
+        if (!p.finishWave) p.warn.push("Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ": its Ready pick tasks get marked Done first");
+        p.finishWave = true;
+      }
       // Items left off a done wave are ignored (23/11/2026): the pick tasks are Done, so it ships.
       p.iff = rec.ifs[0];
       p.isTO = !!row.isTO;
@@ -775,8 +795,17 @@
   async function runOrder(p, dry, say, slot) {
     const d = (p.done = p.done || {});
     if (p.skipLabels) d.labels = true; // shipped before this run: its labels are already out
+    if (p.finishWave && !d.waveDone) {
+      const goOn = await finishWave(p, dry, say, slot);
+      if (!goOn) {
+        p.dryResult = { status: "Wave " + p.rec.wave + ": would mark " + p.pickDone + " Ready pick task(s) Done", method: "then ship its item fulfilment (it doesn't exist until then, so the rest can't be shown in a dry run)", carrier: "", packages: "-", weight: "-" };
+        return "dry";
+      }
+      if (!dry) d.waveDone = true;
+    }
     const ifId = p.iff.id;
     const ifUrl = "/app/accounting/transactions/itemship.nl?id=" + ifId;
+    if (p.push) return pushOrder(p, dry, say, slot, ifUrl);
 
     // 1. Ship (skipped if NetSuite already shows it shipped).
     let justSaved = false;
@@ -1015,6 +1044,99 @@
     return "done";
   }
 
+  // Store orders only (retail SOP 3): the wave's Ready pick tasks (stock that wasn't
+  // picked) are set to Done on each pick task's own page, line by line, then Save. A pick
+  // task that also holds another order is never touched. Then the order's item fulfilment
+  // is used (it appears once the wave is finished). Returns false in a dry run when there's
+  // no item fulfilment yet (nothing more to show).
+  async function finishWave(p, dry, say, slot) {
+    const readyTasks = () => (p.rec.waveId ? search("picktask", [["wavename", "anyof", p.rec.waveId], "AND", ["status", "anyof", "READY"]], [col("status")]) : []);
+    const tasks = readyTasks();
+    let marked = 0;
+    for (const t of tasks) {
+      say("Wave " + p.rec.wave + ": pick task " + (marked + 1) + " of " + tasks.length + " to Done...");
+      const w = await openPage(window.nlapiResolveURL("RECORD", "picktask", t.getId(), true), "the pick task", slot);
+      if (!w.nlapiGetLineItemCount) throw step("Pick tasks", "a pick task on wave " + p.rec.wave + " didn't open in edit mode");
+      const n = w.nlapiGetLineItemCount("pickactions");
+      for (let i = 1; i <= n; i++) {
+        if (String(w.nlapiGetLineItemValue("pickactions", "ordernumber", i)) !== String(p.rec.id)) {
+          throw step("Pick tasks", "a Ready pick task on wave " + p.rec.wave + " also holds another order. Mark it Done by hand, then Retry");
+        }
+      }
+      const said = catchDialogs(w);
+      for (let i = 1; i <= n; i++) {
+        w.nlapiSelectLineItem("pickactions", i);
+        if (w.nlapiGetCurrentLineItemValue("pickactions", "status") === "DONE") continue;
+        w.nlapiSetCurrentLineItemValue("pickactions", "status", "DONE");
+        await sleep(400);
+        w.nlapiCommitLineItem("pickactions");
+        await sleep(300);
+      }
+      marked++;
+      if (dry) {
+        leavePage(w);
+        continue;
+      }
+      const save = w.document.getElementById("btn_multibutton_submitter") || w.document.getElementById("submitter");
+      if (!save) throw step("Pick tasks", "no Save button on the pick task");
+      const saved = nextLoad(60000, "the saved pick task", slot);
+      save.click();
+      await saved;
+      await sleep(800);
+      if (said.length) throw step("Pick tasks", "NetSuite said: " + said.join(" ").slice(0, 200));
+    }
+    p.pickDone = marked;
+    getFrame(slot).src = "about:blank";
+    if (!dry && readyTasks().length) throw step("Pick tasks", "some pick tasks on wave " + p.rec.wave + " are still Ready after saving. Check the wave, then Retry");
+    if (!p.iff) {
+      if (dry) return false;
+      say("Waiting for the item fulfilment...");
+      for (let i = 0; i < 20 && !p.iff; i++) {
+        const f = search("itemfulfillment", [["createdfrom", "anyof", p.rec.id], "AND", ["mainline", "is", "T"]], [col("tranid")])[0];
+        if (f) p.iff = { id: f.getId(), tranid: f.getValue("tranid") };
+        else await sleep(3000);
+      }
+      if (!p.iff) throw step("Pick tasks Done", "the Ready pick tasks are Done but no item fulfilment has appeared on wave " + p.rec.wave + " yet. Check it, then Retry");
+    }
+    return true;
+  }
+
+  // Store order with no packages (retail SOP 3, "push"): Shipped, method Custom, Save.
+  // No courier, packages, labels or connote; nothing prints; never billed.
+  async function pushOrder(p, dry, say, slot, ifUrl) {
+    const d = (p.done = p.done || {});
+    const ifId = p.iff.id;
+    const f = w2f(window.nlapiLookupField("itemfulfillment", ifId, ["statusref"]));
+    if (f.statusref !== "shipped") {
+      say("Opening " + p.iff.tranid + "...");
+      const w = await openPage(ifUrl + "&e=T", "the item fulfilment (edit)", slot);
+      if (!w.nlapiSetFieldValue) throw step("Marking shipped", "the item fulfilment didn't open in edit mode");
+      say("Setting Shipped, Custom...");
+      w.nlapiSetFieldValue("shipstatus", "C");
+      await sleep(1200);
+      if (w.nlapiGetFieldValue("shipmethod") !== METHOD.CUSTOM.id) {
+        w.nlapiSetFieldValue("shipmethod", METHOD.CUSTOM.id);
+        await sleep(2000);
+      }
+      if (w.nlapiGetFieldValue("shipmethod") !== METHOD.CUSTOM.id) throw step("Marking shipped", "couldn't set the shipping method to Custom");
+      if (dry) {
+        p.dryResult = { status: w.nlapiGetFieldText("shipstatus"), method: w.nlapiGetFieldText("shipmethod") + ", no packages", carrier: "none", packages: countPackages(w), weight: "0" };
+        leavePage(w);
+        getFrame(slot).src = "about:blank";
+        await sleep(300);
+        return "dry";
+      }
+      say("Saving...");
+      await saveFulfilment(w, ifId, "Marking shipped", slot);
+    } else if (dry) {
+      p.dryResult = { status: "Already Shipped", method: "nothing to do", carrier: "", packages: "-", weight: "-" };
+      return "dry";
+    }
+    d.shipped = d.labels = d.paper = true;
+    getFrame(slot).src = "about:blank";
+    return "done";
+  }
+
   function w2f(v) {
     return v || {};
   }
@@ -1172,7 +1294,7 @@
         .map(
           (p) =>
             '<tr class="' + (p.action === "flag" ? "nsh-wave-bad" : p.action === "skip" ? "nsh-wave-wait" : "") + '"><td>' + orderLink(p) + "</td><td>" + esc(p.row.customer) +
-            "</td><td>" + esc(p.method ? p.method.name : "") + (p.row.isTO ? "<br>Store order: packing slip, not billed" : p.interflora ? "<br>Packing slip, not invoice" : "") +
+            "</td><td>" + esc(p.method ? p.method.name : "") + (p.push ? "<br>Store order, no packages: marked Shipped only" : p.row.isTO ? "<br>Store order: packing slip, not billed" : p.interflora ? "<br>Packing slip, not invoice" : "") +
             "</td><td>" + esc(pkgText(p.row)) + "</td><td>" + esc(p.action === "ship" ? p.code : "") + "</td><td>" +
             esc(p.action === "ship" ? (p.warn.join("; ") || "Ready") : (p.action === "flag" ? "Not shipped: " : "Skipped: ") + p.why) +
             // Already shipped by someone (or a run that stopped early): their labels may not be out.
