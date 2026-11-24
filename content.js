@@ -4,6 +4,22 @@
 (function () {
   "use strict";
 
+  // ---------- Enter in the Helper's paste boxes ----------
+  // Enter (with or without Shift) in any of the Helper's paste boxes just makes a new
+  // line. NetSuite's own key handling would otherwise submit the page's form: on the Item
+  // Fulfillment search page that runs a search of every fulfilment and freezes the tab
+  // (25/11/2026). Caught on window, capture phase, before NetSuite's handlers see it.
+  const newLineInBox = (e) => {
+    const t = e.target;
+    if (!t || t.tagName !== "TEXTAREA" || !/^nsh-/.test(t.id || "") || e.key !== "Enter" || e.isComposing) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    if (e.type !== "keydown") return;
+    t.setRangeText("\n", t.selectionStart, t.selectionEnd, "end");
+    t.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  ["keydown", "keypress", "keyup"].forEach((type) => window.addEventListener(type, newLineInBox, true));
+
   // ---------- shared helpers ----------
 
   let toastEl = null;

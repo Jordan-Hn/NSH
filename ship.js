@@ -51,7 +51,18 @@
   function parseRows(text) {
     const rows = [];
     const seen = {};
-    text.split(/\r?\n/).forEach((line, lineNo) => {
+    // Two rows pasted without a line break between them ("...7CTNS SO427203 CASH SALE..."):
+    // split before every order number after the first, so each order keeps its own
+    // cells (otherwise the first order could pick up the second one's packages, 25/11/2026).
+    const splitJoined = (line) => {
+      const starts = [];
+      const re = /(?:^|[\s,;])((?:SO|TO)\d{5,})(?=\s|$)/gi;
+      let m;
+      while ((m = re.exec(line))) starts.push(m.index + m[0].length - m[1].length);
+      if (starts.length < 2) return [line];
+      return starts.map((s, i) => line.slice(i ? s : 0, starts[i + 1] === undefined ? line.length : starts[i + 1]).replace(/[\s,;]+$/, ""));
+    };
+    text.split(/\r?\n/).flatMap(splitJoined).forEach((line, lineNo) => {
       if (!line.trim()) return;
       const cells = line.split("\t");
       const up = cells.map((c) => c.trim().toUpperCase());
@@ -306,7 +317,12 @@
       }
       // Fulfilment location doesn't matter (e.g. Warehouses : Online) as long as the wave is Complete (23/11/2026).
       if (rec.invoices.length) return out("flag", "Already has an invoice (" + rec.invoices[0].tranid + "), do it by hand");
-      if (rec.wave && !/complete/i.test(rec.waveStatus)) {
+      // A wave still Released (never started) next to an item fulfilment: the order was
+      // fulfilled outside the wave (e.g. its own Fulfill button), so the wave is a leftover
+      // and the fulfilment is what ships (SO424877 / SO427203, 25/11/2026).
+      const leftoverWave = rec.wave && /released/i.test(rec.waveStatus) && rec.ifs.length;
+      if (leftoverWave && !row.isTO) p.warn.push("Wave " + rec.wave + " was never picked (still Released); shipping item fulfilment " + rec.ifs[0].tranid + ", which was made outside the wave");
+      if (rec.wave && !/complete/i.test(rec.waveStatus) && !(leftoverWave && !row.isTO)) {
         if (!row.isTO) return out("flag", "Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ", not Complete");
         if (!p.finishWave) p.warn.push("Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ": its Ready pick tasks get marked Done first");
         p.finishWave = true;

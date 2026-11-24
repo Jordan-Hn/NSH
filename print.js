@@ -50,7 +50,19 @@
       good.push(o);
       return true;
     };
-    text.split(/\r?\n/).forEach((line) => {
+    // Tracker rows pasted without a line break between them ("...7CTNS SO427203 ..."):
+    // split before every order number after the first, so each keeps its own courier and
+    // state (25/11/2026). Plain lists with several numbers on a line are left alone.
+    const splitJoined = (line) => {
+      if (!/\t/.test(line)) return [line];
+      const starts = [];
+      const re = /(?:^|[\s,;])((?:SO|TO)\d{5,})(?=\s|$)/gi;
+      let m;
+      while ((m = re.exec(line))) starts.push(m.index + m[0].length - m[1].length);
+      if (starts.length < 2) return [line];
+      return starts.map((s, i) => line.slice(i ? s : 0, starts[i + 1] === undefined ? line.length : starts[i + 1]).replace(/[\s,;]+$/, ""));
+    };
+    text.split(/\r?\n/).flatMap(splitJoined).forEach((line) => {
       const up = line.toUpperCase();
       const orders = up.match(/\b(TO|SO)\d+\b/g) || [];
       if (!orders.length) {

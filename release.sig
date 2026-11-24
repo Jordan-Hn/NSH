@@ -1,5 +1,5 @@
 {
-    "version":  "0.21.7",
+    "version":  "0.21.8",
     "files":  [
                   {
                       "path":  "autoprint\\AutoPrint.ps1",
@@ -243,7 +243,7 @@
                   },
                   {
                       "path":  "content.js",
-                      "sha256":  "7B157628AE031D3758073FAD975F8C87EEA60C85A78E29626B65656FED0AE55E"
+                      "sha256":  "6676257644454476342B7DEAAC6BE8A60DA80CC707A2A630BC978C8D36189ED8"
                   },
                   {
                       "path":  "icons\\icon128.png",
@@ -271,7 +271,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "F69DB082D7B1B8D1C3E4C7F1816C41E862078E433F67DEDE7B6768F0E8FE3236"
+                      "sha256":  "1E262406A5CF6481EB40BF261B6DD6D76CD895EEAB0B8D553D3940A3F1B2AC68"
                   },
                   {
                       "path":  "orders.js",
@@ -279,11 +279,11 @@
                   },
                   {
                       "path":  "print.js",
-                      "sha256":  "1B0BE97AF0CCB22257FC20D1D835BE20D64F13B8C095099F1273199ED170E26E"
+                      "sha256":  "3219B9B8B1D51465B0954C3F8D7E15CFA9FF59A2432CFE62F8B0A366483547FD"
                   },
                   {
                       "path":  "ship.js",
-                      "sha256":  "13E5A392BAD5E7B4475D8AA9BE1962B3B3E05562F9FF8F3FD916DADCB2008A23"
+                      "sha256":  "F40F4DC9DD6ECB0EFB15A46E6D30B67CB6C6761D00EF1380912906575629511B"
                   },
                   {
                       "path":  "stats.js",
@@ -291,12 +291,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "77AB2652531E7595C1A90369384062B7AB2BE87850DC30B6FD6759EC351DBD96"
+                      "sha256":  "853A1CEAE1D0B4FB9FD8F6CDDE70F3C0B0FA2844A6BD01002004A840BD274D43"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "F82462DA01C159D438E6B210AF08B61ACFD99C6C680AAD62D98933DA48FBF797"
                   }
               ],
-    "signature":  "lEIYEb35Fg/zPgyXj7zNno+Q8CVUe7XkuTvAUIHjTmjEKIjCZpZwOwKH7RdCshAtb5rMv2yuRsuZKgbWYhprJGQz5fSQGgdedhGTukEO3Dp27BT4i/U1qRzzYMZZ36IpBvDx+NE4W5x1rQdW1mnegw8xZhyC4/qE+GWYKxu9wLG/i5vtc7uBO0k6VYvn7x1Z68YknadSd63+rtO4tT70pWuQ4gG3/DZjzCzTf8vGrzhONGMlnXYD+0JNDA7Wv/KuvXftUSC2vqqUrByzJ3sVWrT1A4Z3sHW/cZJNaZPcbGh8E76yGFtHy8X0Sf+8ZV5jLbyxON/ogSxZPlMWXHwAYgg/QGudWKzwUUkO9OOstmRfdtq3rfiEuhmgLeiTYvOx7yXu3VykzTcVnwLm6y/Uoguwnu+20t3Z5Gi1T7bubWOikMnIiTZwrQ8bmJTNLOn0evcMOH42gRo6if9OHgMFvkDMQRJuQHAA0VoWq21CqtMO1u+3wGdaPj/r9IirmB0Z"
+    "signature":  "sl5iAzmDKRdVA7nk5mXq4VVvvdZBv4KQT6yfUU5c1Ofn16d2Lj1Smfh5a0PzZr4H1B9G2B5TJnJHpLHsLwxUWPwm8I/yA8sDbXqszavE4jmWaA24CEFDkMZrMerqLWnQ5tNabFPmCuY1eVVJ/QhF4zPUl8xLnDRf9soX5Og8IHJiVDvo5wji9G39SCwqgX52Pdteb7YxNg70L8NtKz1tVNpxTbYmRsplJNG87OBiZ7BqV3EjFRjz3bQRcnB7u6uEm29EWv7+CUd+OuX+Mt7Z0U8NRYynG8psWgYARhif2SEEwDz6cWzINvCpvNR4HFjWGHFC9QtL+Uj+M0U4CFCJf4GcWSA5Fm8jW9FlZHbOw/ieaRjZFk9KXPSidSdbL2tPcf+FzO9Nrw0PqbfFwWC8oNU7aBoXEaAX8zXChVRrgrw/fMA4cg07BXTrRgLRDVv1GW1wueJjOQrvggK3qOxwCd7AkFj72MfijJO/tNaPTk7OeoKfE4O6y7AxuQPNdozw"
 }

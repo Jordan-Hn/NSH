@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NetSuite Helper (KoKo Black)",
-  "version": "0.21.7",
+  "version": "0.21.8",
   "description": "Quality-of-life tweaks for NetSuite, plus one-click Auto Print of the open label or invoice PDF.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOW58CPAgf/zSYpgSRhLRHNU02WrthdeKr4htJthyDSOKUOtnOc7edt1J3cejIIoyhSya088F5N8HzSLQRd4XJWvyfS82zWHKtU68CYnm0w3v1946/AWh0jKN2scGZi1lwvqjinKXNIWTv8uD/8+oAna900gOO4L/su4tKw9BxvIwjzjnlcVj3FJ2cFsqqTelqx4sM17/z48bQYoY3tG4eJ/RWgZvvmXlkTyw9DZX4GDWlm5cIy3TNrVwvLvtuo9LD11mrGu2kLx92WpikZpSk4P2XbmlMP2Asf2sxuEBsFCg+6iJQWjtr800Hw3EQLQR4YxR89y1+G+eud71Yxd3QIDAQAB",
   "permissions": ["activeTab", "downloads", "scripting", "nativeMessaging"],
