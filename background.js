@@ -10,7 +10,7 @@
 //    the order's item fulfilment), so they're easy to match with their labels.
 //    If that fails in any way, the invoice prints exactly as before.
 
-importScripts("lib/pdf-lib.min.js");
+importScripts("lib/pdf-lib.min.js", "lib/packingslip-fix.js");
 
 const FOLDER = "AutoPrint";
 
@@ -252,6 +252,41 @@ async function invoiceWithConnote(tab, invoiceId) {
   return "data:application/pdf;base64," + btoa(bin);
 }
 
+// ---------- packing slips ----------
+// A NetSuite packing slip (its print icon, or a hotprint packing slip link).
+function isPackingSlip(url) {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith(".netsuite.com")) return false;
+    if (/\/print\/hotprint\.nl$/i.test(u.pathname)) return /packingslip/i.test(u.searchParams.get("printtype") || "");
+    return /nlsprintform\.nl$/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+// Runs inside a NetSuite page (needs the login): the PDF as base64.
+async function fetchPdfB64(pdfUrl) {
+  const bytes = new Uint8Array(await (await fetch(pdfUrl, { credentials: "include" })).arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+// Returns a data: URL of the tidied packing slip, or null to print it as it is.
+async function tidiedPackingSlip(tab) {
+  const helperTab = await netsuiteTabFor(tab);
+  if (helperTab == null) return null;
+  const [res] = await withTimeout(chrome.scripting.executeScript({ target: { tabId: helperTab }, world: "MAIN", func: fetchPdfB64, args: [tab.url] }), 10000);
+  const b64 = res && res.result;
+  if (!b64) return null;
+  const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  if (String.fromCharCode(...raw.slice(0, 5)) !== "%PDF-") return null;
+  const fixed = await self.nshFixPackingSlip(raw);
+  if (!fixed) return null;
+  let bin = "";
+  for (let i = 0; i < fixed.length; i += 0x8000) bin += String.fromCharCode.apply(null, fixed.subarray(i, i + 0x8000));
+  return "data:application/pdf;base64," + btoa(bin);
+}
+
 chrome.action.onClicked.addListener(async (tab) => {
   if (!isAllowedSite(tab.url)) {
     flash(tab.id, "NS?", "#b00020");
@@ -269,6 +304,18 @@ chrome.action.onClicked.addListener(async (tab) => {
       }
     } catch (e) {
       console.warn("Connote stamp skipped:", e); // fall through: print it as it is
+    }
+  }
+  if (isPackingSlip(tab.url)) {
+    try {
+      const tidied = await tidiedPackingSlip(tab);
+      if (tidied) {
+        await chrome.downloads.download({ url: tidied, filename: fileNameFor(tab), saveAs: false, conflictAction: "uniquify" });
+        flash(tab.id, "OK", "#1b7f3b");
+        return;
+      }
+    } catch (e) {
+      console.warn("Packing slip tidy skipped:", e); // fall through: print it as it is
     }
   }
   try {

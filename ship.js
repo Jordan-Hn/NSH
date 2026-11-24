@@ -545,6 +545,16 @@
 
   const invoicePdfUrl = (id) =>
     "/app/accounting/print/hotprint.nl?regular=T&sethotprinter=T&formnumber=" + INVOICE_FORM + "&trantype=custinvc&id=" + encodeURIComponent(id) + "&label=Invoice&printtype=transaction";
+  // Packing slips: the template's overlapping placeholder text is tidied (lib/packingslip-fix.js);
+  // if that ever fails, the slip prints as NetSuite made it.
+  async function tidySlip(bytes) {
+    try {
+      return (window.nshFixPackingSlip && (await window.nshFixPackingSlip(bytes))) || bytes;
+    } catch (e) {
+      console.warn("[NetSuite Helper] packing slip tidy skipped", e);
+      return bytes;
+    }
+  }
   const packingSlipUrl = (soId, ifId, orgType) =>
     "/app/accounting/print/hotprint.nl?regular=T&sethotprinter=T&id=" + encodeURIComponent(soId) + "&label=Packing%20Slip&printtype=packingslip&trantype=itemship&orgtrantype=" + (orgType || "SalesOrd") + "&auxtrans=" + encodeURIComponent(ifId);
 
@@ -971,7 +981,7 @@
     if (p.row.isTO) {
       if (!d.paper) {
         say("Getting the packing slip...");
-        queuePrint(p, { bytes: await fetchPdf(packingSlipUrl(p.rec.id, ifId, "TrnfrOrd")), name: "PackingSlip_" + p.row.so + ".pdf" });
+        queuePrint(p, { bytes: await tidySlip(await fetchPdf(packingSlipUrl(p.rec.id, ifId, "TrnfrOrd"))), name: "PackingSlip_" + p.row.so + ".pdf" });
         d.paper = true;
       }
       getFrame(slot).src = "about:blank";
@@ -981,7 +991,7 @@
     // 4. Interflora: packing slip straight after the labels (SOP 2 part F prints it before Bill).
     if (p.interflora && !d.paper) {
       say("Getting the packing slip...");
-      queuePrint(p, { bytes: await fetchPdf(packingSlipUrl(p.rec.id, ifId)), name: "PackingSlip_" + p.row.so + ".pdf" });
+      queuePrint(p, { bytes: await tidySlip(await fetchPdf(packingSlipUrl(p.rec.id, ifId))), name: "PackingSlip_" + p.row.so + ".pdf" });
       d.paper = true;
     }
 
@@ -998,7 +1008,7 @@
         // print its packing slip instead and finish it, not billed (25/11/2026).
         if (!d.paper) {
           say("No Bill button: getting the packing slip...");
-          queuePrint(p, { bytes: await fetchPdf(packingSlipUrl(p.rec.id, ifId)), name: "PackingSlip_" + p.row.so + ".pdf" });
+          queuePrint(p, { bytes: await tidySlip(await fetchPdf(packingSlipUrl(p.rec.id, ifId))), name: "PackingSlip_" + p.row.so + ".pdf" });
           d.paper = true;
         }
         p.noBill = true;
