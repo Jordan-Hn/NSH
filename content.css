@@ -1,0 +1,369 @@
+/* Styles copied from NetSuite's own UI (measured on the live site), so
+   additions blend in: Open Sans, field-group bars, grey labels, blue/grey
+   buttons, list tables. */
+
+/* ---------- click to copy ---------- */
+
+.nsh-copyable {
+  cursor: copy;
+  border-radius: 3px;
+  transition: background-color 0.15s;
+}
+.nsh-copyable:hover {
+  background-color: #e6f0ff;
+  outline: 1px dashed #006aff;
+}
+
+.nsh-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: #303030;
+  color: #fff;
+  font: 600 13px/18px "Open Sans", Helvetica, sans-serif;
+  padding: 8px 14px;
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 2147483647;
+}
+.nsh-toast.nsh-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- bulk waves panel (looks like a NetSuite field group) ---------- */
+
+.nsh-wave-panel {
+  margin: 8px 0 15px;
+  font: 400 13px "Open Sans", Helvetica, sans-serif;
+  color: #303030;
+}
+.nsh-fg-title {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 1px 4px;
+  background: #dfe4eb;
+  color: #303030;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.nsh-chevron {
+  width: 24px;
+  height: 24px;
+  background: url("/uirefresh/img/icon/chevron-down.svg") center / 16px no-repeat;
+  transition: transform 0.15s;
+}
+.nsh-collapsed .nsh-chevron {
+  transform: rotate(-90deg);
+}
+.nsh-collapsed .nsh-fg-body {
+  display: none;
+}
+.nsh-fg-body {
+  padding: 10px 12px 4px;
+  max-width: 900px;
+}
+.nsh-fg-body p {
+  margin: 4px 0 8px;
+}
+.nsh-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #6f6f6f;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.nsh-wave-panel textarea {
+  width: 300px;
+  padding: 3px;
+  border: 1px solid #ccc;
+  border-radius: 0;
+  font: 400 13px/18px "Open Sans", Helvetica, sans-serif;
+  color: #262626;
+  background: #fff;
+}
+.nsh-wave-panel textarea:focus {
+  outline: none;
+  border-color: #006aff;
+}
+
+/* NetSuite buttons: grey by default, blue for the main action. */
+.nsh-wave-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+.nsh-wave-panel button,
+.nsh-wave-bar button {
+  height: 28px;
+  padding: 4px 8px;
+  border: 1px solid #c9c9c9;
+  border-radius: 3px;
+  background: #e4e4e4;
+  color: #303030;
+  font: 600 13px/18px "Open Sans", Helvetica, sans-serif;
+  cursor: pointer;
+}
+.nsh-wave-panel button:hover,
+.nsh-wave-bar button:hover {
+  background: #d6d6d6;
+}
+.nsh-wave-panel button.nsh-primary {
+  background: #006aff;
+  border-color: #006aff;
+  color: #fff;
+}
+.nsh-wave-panel button.nsh-primary:hover {
+  background: #0058d6;
+}
+.nsh-wave-panel button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.nsh-wave-warn {
+  color: #b45309;
+}
+.nsh-wave-hint {
+  color: #6f6f6f;
+  font-size: 12px;
+}
+
+/* NetSuite list table. */
+.nsh-wave-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 6px 0 8px;
+}
+.nsh-wave-table th {
+  background: #e5e5e5;
+  color: #666;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  text-align: left;
+  vertical-align: bottom;
+  padding: 6px 15px 6px 5px;
+  border-bottom: 1px solid #ebebeb;
+}
+.nsh-wave-table td {
+  background: #fff;
+  color: #333;
+  font-size: 13px;
+  padding: 4px 15px 4px 5px;
+  border-bottom: 1px solid #ebebeb;
+  vertical-align: top;
+}
+.nsh-wave-table tr.nsh-wave-bad td {
+  color: #c00;
+}
+.nsh-wave-table tr.nsh-wave-dupe td {
+  background: #fff8db;
+}
+.nsh-wave-table tr.nsh-wave-wait td {
+  color: #888;
+}
+.nsh-wave-num {
+  color: #255599;
+}
+.nsh-print-stamp {
+  display: block;
+  margin: 4px 0 8px;
+  color: #303030;
+  font-size: 13px;
+}
+.nsh-print-open {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid #c9c9c9;
+  border-radius: 3px;
+  background: #e4e4e4;
+  color: #303030;
+  font: 600 13px/18px "Open Sans", Helvetica, sans-serif;
+  text-decoration: none;
+}
+.nsh-print-open:hover {
+  background: #d6d6d6;
+}
+.nsh-order-link {
+  color: #255599;
+  text-decoration: none;
+}
+.nsh-order-link:hover {
+  text-decoration: underline;
+}
+
+/* Progress bar shown while a run is going. */
+.nsh-wave-bar {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #fff;
+  color: #303030;
+  font: 600 13px "Open Sans", Helvetica, sans-serif;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid #c9c9c9;
+  border-left: 4px solid #006aff;
+  border-radius: 3px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  z-index: 2147483647;
+}
+
+/* Home page "NetSuite Helper" shortcuts box: NetSuite portlet with soft tiles.
+   --nsh-tile = the person's theme colour (nav bar), set by content.js; slate blue if unread. */
+.nsh-home-portlet { margin: 0 0 16px; }
+.nsh-home-header { padding: 0 16px; }
+.nsh-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 4px 16px 16px; }
+.nsh-home-tile { display: block; background: #f5f7fa; border: 1px solid #dfe4eb; border-radius: 4px; padding: 10px 12px; text-decoration: none !important; font-family: "Open Sans", Helvetica, sans-serif; transition: background 0.15s, border-color 0.15s; }
+.nsh-home-tile:hover { background: #e9eef5; border-color: var(--nsh-tile, #5a6e95); }
+.nsh-home-name { display: block; font-size: 14px; font-weight: 700; line-height: 1.3; color: var(--nsh-tile-text, #3d4f73); }
+.nsh-home-what { display: block; font-size: 12px; color: #5f6b7a; margin-top: 2px; line-height: 1.35; }
+
+/* "Helper" menu dropdown at the end of the nav bar. The rows use NetSuite's own
+   dropdown classes (set in content.js), so they look and hover exactly like
+   NetSuite's. This file only adds the box (white, NetSuite's shadow) and a few
+   backups that match NetSuite in case its class names change. */
+.nsh-nav-drop { display: none; position: fixed; z-index: 100000; min-width: 184px; box-shadow: rgba(0, 0, 0, 0.5) 0px 1px 4px 0px; }
+.nsh-nav-drop-body { background: #fff; }
+.nsh-nav-drop a { text-decoration: none !important; }
+.nsh-nav-row > a > div { min-height: 40px; box-sizing: border-box; padding: 8px 12px; display: flex; align-items: center; }
+.nsh-nav-row > a > div > span { font-family: "Open Sans", Helvetica, sans-serif; font-size: 14px; font-weight: 600; color: rgb(48, 48, 48); white-space: nowrap; }
+.nsh-nav-row:hover { background-color: rgba(0, 0, 0, 0.1); }
+.nsh-nav-drop [role="group"] + [role="group"] { border-top: 1px solid rgb(201, 201, 201); }
+.nsh-ship-labels { display: inline-block; margin-top: 4px; font-weight: 600; cursor: pointer; }
+.nsh-ship-labels input { vertical-align: middle; margin: 0 4px 0 0; }
+
+/* Pending orders summary (stats.js) on the "Not Printed" saved search. The tables
+   use NetSuite's own list classes; this only sets spacing and a few colours. */
+.nsh-stats-tables { display: flex !important; flex-wrap: wrap; gap: 8px 0; margin: 0 0 8px; align-items: flex-start; width: auto !important; }
+.nsh-stats-table td.uir-list-header-td, .nsh-stats-table td.uir-list-row-cell { padding: 6px 14px !important; white-space: nowrap; width: auto !important; }
+.nsh-stats-table, table.uir-list-body.nsh-stats-table { width: max-content !important; min-width: 0 !important; max-width: 100%; flex: 0 0 auto; border-collapse: collapse; }
+.nsh-stats-table td.uir-list-row-cell { background: #fff !important; text-align: center; font-size: 13px; }
+.nsh-stat-bad { color: #b00020 !important; font-weight: 600; }
+.nsh-stat-on { font-weight: 700; }
+.nsh-stat-zero { color: #999; }
+.nsh-stats-showing { font: 12px "Open Sans", Helvetica, sans-serif; color: #333; margin: 0 0 6px; }
+tr.nsh-overdue-row > td, tr.nsh-overdue-row > td.uir-list-row-cell { background: #fbe3e3 !important; background-color: #fbe3e3 !important; }
+.nsh-stock-ready { color: #1b7f3b; }
+.nsh-stock-short { color: #b00020; font-weight: 600; cursor: pointer; }
+.nsh-stock-check { color: #8a5a00; font-weight: 600; cursor: help; }
+.nsh-stock-wait { color: #888; }
+/* Section headings in the grouped "Not Printed" list (like NetSuite's grey field-group bars) */
+tr.nsh-group-row > td { background: #dfe4eb !important; padding: 6px 15px !important; font: 600 13px "Open Sans", Helvetica, sans-serif; color: #333; border-top: 8px solid #fff; }
+tr.nsh-group-row .nsh-group-count { font-weight: 400; color: #666; margin-left: 6px; }
+.nsh-stock-cell { white-space: nowrap; }
+.nsh-stock-head, .nsh-stock-head .listheader { text-align: left !important; }/* Five Home tiles: the first (Pending Orders) spans the full width so the grid stays even. */
+.nsh-home-grid .nsh-home-tile:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
+/* Order Details tables (NetSuite list classes) */
+.nsh-orders-table { width: auto !important; border-collapse: collapse; margin: 0 0 10px; }
+.nsh-orders-table td { white-space: nowrap; }
+.nsh-export-note { font: 12px "Open Sans", Helvetica, sans-serif; color: #666; align-self: center; margin-left: 6px; }
+
+.nsh-ship-restore { font: 13px "Open Sans", Helvetica, sans-serif; color: #333; margin: 10px 0 0; }
+
+/* Pending Orders "This page as a PDF": only the clean copy prints, landscape, colours kept */
+#nsh-print-sheet { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  body.nsh-printing > *:not(#nsh-print-sheet) { display: none !important; }
+  body.nsh-printing { background: #fff !important; }
+  body.nsh-printing #nsh-print-sheet { display: block; font: 9pt "Open Sans", Helvetica, Arial, sans-serif; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #nsh-print-sheet .nsh-print-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #607799; margin: 0 0 6pt; }
+  #nsh-print-sheet h1 { font-size: 15pt; margin: 0 0 3pt; color: #333; }
+  #nsh-print-sheet .nsh-print-head span { color: #666; }
+  #nsh-print-sheet .nsh-print-summary { border-collapse: collapse; margin: 0 12pt 6pt 0; display: inline-table; }
+  #nsh-print-sheet .nsh-print-summary th { background: #e5e5e5; color: #666; font-weight: 400; font-size: 7.5pt; text-transform: uppercase; padding: 3pt 8pt; text-align: center; }
+  #nsh-print-sheet .nsh-print-summary td { padding: 3pt 8pt; text-align: center; font-weight: 600; color: #255599; }
+  #nsh-print-sheet .nsh-print-list { width: 100%; border-collapse: collapse; margin-top: 4pt; }
+  #nsh-print-sheet .nsh-print-list thead { display: table-header-group; }
+  #nsh-print-sheet .nsh-print-list th { background: #e5e5e5; color: #666; font-weight: 400; font-size: 7.5pt; text-transform: uppercase; text-align: left; padding: 4pt 6pt; }
+  #nsh-print-sheet .nsh-print-list td { padding: 3pt 6pt; border-bottom: 0.5pt solid #e3e3e3; vertical-align: top; }
+  #nsh-print-sheet .nsh-print-list tr { page-break-inside: avoid; }
+  #nsh-print-sheet .nsh-print-group td { background: #dfe4eb; font-weight: 600; font-size: 9.5pt; padding: 4pt 6pt; border-top: 6pt solid #fff; }
+  #nsh-print-sheet .nsh-print-stripe td { background: #e8edf4; }
+  #nsh-print-sheet .nsh-print-overdue td { background: #fbe3e3; }
+  #nsh-print-sheet .nsh-print-stock-short { color: #b00020; font-weight: 600; }
+  #nsh-print-sheet .nsh-print-stock-check { color: #8a5a00; font-weight: 600; }
+  #nsh-print-sheet .nsh-print-stock-ready { color: #1b7f3b; }
+  /* Tiles view prints as cards (v0.19.6) */
+  #nsh-print-sheet .nsh-print-cardgroup { background: #dfe4eb; font-weight: 600; font-size: 9.5pt; padding: 4pt 6pt; margin: 8pt 0 5pt; break-after: avoid; }
+  #nsh-print-sheet .nsh-print-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5pt; }
+  #nsh-print-sheet .nsh-print-card { border: 0.75pt solid #c9d1dc; border-radius: 3pt; padding: 4pt 6pt; break-inside: avoid; page-break-inside: avoid; background: #fff; }
+  #nsh-print-sheet .nsh-print-card.nsh-print-overdue { background: #fbe3e3; }
+  #nsh-print-sheet .nsh-print-cardtop { display: flex; gap: 14pt; font-weight: 600; font-size: 9.5pt; }
+  #nsh-print-sheet .nsh-print-field { margin: 0 0 3pt; }
+  #nsh-print-sheet .nsh-print-field > span { display: block; color: #6f6f6f; font-weight: 400; font-size: 6.5pt; text-transform: uppercase; }
+}
+/* Pending Orders Summary in NetSuite's Filters box (v0.18.7) */
+#nsh-stats-panel.nsh-stats-box { margin: 8px 0 12px; }
+#nsh-stats-panel .uir-filters-body { padding-top: 8px; }
+#nsh-view-switch { cursor: pointer; }
+
+/* Pending Orders views (v0.19): Normal / Large rows / Tiles. Only a class on #div__body. */
+.nsh-stock-all { display: none; }
+#nsh-view-field { margin-left: 20px; }
+#nsh-view-field input { cursor: pointer; }
+#nsh-view-field .uir-field { cursor: pointer; }
+
+/* Large rows: text wraps, nothing cut off, the whole stock list shows. */
+#div__body.nsh-view-large tr.uir-list-row-tr > td { white-space: normal !important; vertical-align: top !important; padding-top: 7px !important; padding-bottom: 7px !important; font-size: 13px !important; line-height: 1.4 !important; }
+#div__body.nsh-view-large .nsh-stock-brief { display: none; }
+#div__body.nsh-view-large .nsh-stock-all { display: block; color: #303030; font-weight: 400; font-size: 12px; margin-top: 2px; }
+
+/* Tiles: one card per order, values under their column names. */
+#div__body.nsh-view-tiles, #div__body.nsh-view-tiles > tbody { display: block !important; width: 100% !important; }
+#div__body.nsh-view-tiles > tbody { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; padding: 8px 0 12px; }
+#div__body.nsh-view-tiles tr.uir-list-headerrow { display: none !important; }
+#div__body.nsh-view-tiles tr.nsh-group-row { display: block; grid-column: 1 / -1; margin-top: 4px; }
+#div__body.nsh-view-tiles tr.nsh-group-row > td { display: block; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr {
+  display: grid; grid-template-columns: 1fr 1fr auto; align-content: start;
+  grid-template-areas: "doc date edit" "name name name" "status dept amount" "memo memo memo" "stock stock stock";
+  border: 1px solid #dfe4eb; border-radius: 4px; overflow: hidden; background: var(--nsh-tile-bg, #fff);
+}
+#div__body.nsh-view-tiles tr.uir-list-row-tr:hover { border-color: #b5bfcc; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td { display: block; width: auto !important; height: auto !important; padding: 5px 12px !important; white-space: normal !important; text-align: left !important; font-size: 13px !important; line-height: 1.35 !important; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-blank] { display: none; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area=""], #div__body.nsh-view-tiles tr.uir-list-row-tr > td:not([data-area]) { grid-column: 1 / -1; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-label]:not([data-label=""])::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 400; color: #6f6f6f; text-transform: uppercase; margin-bottom: 1px; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="doc"] { grid-area: doc; font-weight: 600 !important; font-size: 14px !important; padding-top: 9px !important; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="date"] { grid-area: date; padding-top: 9px !important; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="edit"] { grid-area: edit; padding-top: 9px !important; text-align: right !important; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="name"] { grid-area: name; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="status"] { grid-area: status; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="dept"] { grid-area: dept; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="amount"] { grid-area: amount; text-align: right !important; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="memo"] { grid-area: memo; }
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="stock"] { grid-area: stock; padding-bottom: 9px !important; }
+#div__body.nsh-view-tiles .nsh-stock-brief { display: none; }
+#div__body.nsh-view-tiles .nsh-stock-all { display: block; color: #303030; font-weight: 400; font-size: 12px; margin-top: 2px; }
+/* Stock details box (v0.19.3): hover shows it, click keeps it open. */
+.nsh-stock-check { cursor: pointer; }
+td.nsh-stock-pop-cell { position: relative; overflow: visible !important; }
+.nsh-stock-pop { position: absolute; right: 4px; top: 100%; z-index: 50; min-width: 260px; max-width: 460px; padding: 6px 10px; background: #fff; border: 1px solid #c8c8c8; border-radius: 3px; box-shadow: 0 2px 6px rgba(0,0,0,.18); font: 400 12px/1.5 "Open Sans", Helvetica, sans-serif; color: #303030; white-space: normal; text-align: left; }
+.nsh-stock-pop-pinned { border-color: #8c9bb0; }
+.nsh-stock-pop-head { font-weight: 600; color: #b00020; margin-bottom: 2px; }
+.nsh-print-stock-short, .nsh-print-stock-check { white-space: normal; }
+/* Summary counts as soft pills (v0.19.9, option C): blue, red for overdue/short, darker when picked. */
+.nsh-stats-table a.nsh-stat { display: inline-block; min-width: 22px; padding: 1px 9px; border: 0 !important; border-radius: 10px; background: #e3ebf6; color: #1f4a85 !important; font-weight: 600; text-decoration: none !important; line-height: 18px; cursor: pointer; }
+.nsh-stats-table a.nsh-stat:hover { background: #cddbef; }
+.nsh-stats-table a.nsh-stat.nsh-stat-bad { background: #fbe3e3; color: #9b111e !important; }
+.nsh-stats-table a.nsh-stat.nsh-stat-bad:hover { background: #f6cdcd; }
+.nsh-stats-table a.nsh-stat.nsh-stat-on { background: #1f4a85; color: #fff !important; }
+.nsh-stats-table a.nsh-stat.nsh-stat-bad.nsh-stat-on { background: #9b111e; color: #fff !important; }
+/* Tiles: no stripes, plain white cards (overdue light red), v0.19.14 */
+#div__body.nsh-view-tiles tr.uir-list-row-tr > td { --nsh-cell-bg: var(--nsh-tile-bg, #fff); border-color: transparent !important; }

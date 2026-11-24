@@ -1,0 +1,7 @@
+{
+  "name": "com.kokoblack.autoprint",
+  "description": "Starts and watches the AutoPrint helper for NetSuite Helper",
+  "path": "host.cmd",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://ljbmdmjlnncogckhfbdmcbckmdkeiagc/"]
+}
