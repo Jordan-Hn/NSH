@@ -395,3 +395,11 @@ td.nsh-home-summary { padding: 0 0 0 22px !important; vertical-align: middle; wh
 .nsh-home-summary a.nsh-stat.nsh-stat-bad.nsh-stat-on { background: #9b111e; color: #fff !important; }
 .nsh-home-summary .nsh-stat-zero { color: #999; font-size: 12px; }
 .nsh-home-summary a.nsh-home-all { font-size: 12px; white-space: nowrap; }
+/* Ship Orders: an order left out of the run (Ship tick box unticked), v0.23.4 */
+tr.nsh-ship-left-out > td { color: #9a9a9a !important; }
+tr.nsh-ship-left-out > td a { color: #9a9a9a !important; }
+.nsh-ship-pick { cursor: pointer; margin: 2px 0 0; }
+
+/* Ship Orders Method dropdown (v0.23.8) */
+select.nsh-ship-method { max-width: 230px; font: 400 12px "Open Sans", Helvetica, sans-serif; color: #262626; border: 1px solid #ccc; border-radius: 3px; padding: 2px 4px; background: #fff; }
+select.nsh-ship-method:focus { outline: 2px solid #607799; outline-offset: 1px; }

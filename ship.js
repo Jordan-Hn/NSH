@@ -35,6 +35,35 @@
   const INVOICE_FORM = "195";
   const KBH = "Warehouses : KBH Warehouse";
   const DRY_KEY = "nshShipDryRun"; // "1" = fill in, never save (tests)
+  // The Dry run tick box is only for testing (25/11/2026): hidden unless this browser has it
+  // switched on. Alt+Shift+D on the Ship Orders page shows / hides it (remembered).
+  const DRY_SHOW_KEY = "nshShowDryRun";
+  function dryShown() {
+    try {
+      return localStorage.getItem(DRY_SHOW_KEY) === "1" || localStorage.getItem(DRY_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+  if (document.addEventListener) document.addEventListener("keydown", (e) => {
+    if (!(e.altKey && e.shiftKey && !e.ctrlKey && (e.key === "D" || e.key === "d" || e.code === "KeyD"))) return;
+    e.preventDefault();
+    const on = !dryShown();
+    try {
+      if (on) localStorage.setItem(DRY_SHOW_KEY, "1");
+      else localStorage.removeItem(DRY_SHOW_KEY);
+    } catch (err) {}
+    const row = document.getElementById("nsh-ship-dry-row");
+    if (row) {
+      row.style.display = on ? "" : "none";
+      if (!on) row.querySelector("input").checked = false;
+    }
+    const note = document.createElement("div");
+    note.className = "nsh-toast nsh-show";
+    note.textContent = on ? "Dry run option shown" : "Dry run option hidden";
+    document.body.appendChild(note);
+    setTimeout(() => note.remove(), 1600);
+  });
 
   const STATES = ["VIC", "NSW", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
   const COURIERS = { CHILL: "CHILL", STE: "STE", STP: "STP", FW: "FW", FREEWAY: "FW", PICKUP: "PICKUP", "PICK UP": "PICKUP", PU: "PICKUP" };
@@ -916,9 +945,12 @@
       throw step("Shipped, consignment voided, not billed", "Ready Freight chose Aus Post Express instead of the courier. The consignment is voided; check and fix the address (" + addr + "), then Retry. No label printed");
     };
 
+    // Aus Post Express is only a problem when nobody chose it (it's Ready Freight's fallback
+    // for a bad address). Picked in the Method box on purpose: leave it.
+    const wantAusPost = /AUSTRALIA POST|EXPRESS POST/i.test((p.method && p.method.name) || "");
     let rf = carrierOf(ifId);
     if (p.row.courier !== "PICKUP" && !d.labels) {
-      if (isAusPost(rf) && rf.custbodyrsc_freight_carrier_consid) await voidAndStop();
+      if (isAusPost(rf) && rf.custbodyrsc_freight_carrier_consid && !wantAusPost) await voidAndStop();
       if (!justSaved && !rf.custbodyrsc_freight_carrier_consid) {
         // Shipped earlier with no consignment (e.g. voided, address now fixed): check the
         // state, give it the courier and packages, save again.
@@ -944,7 +976,7 @@
           await sleep(4000);
           rf = carrierOf(ifId);
         }
-        if (isAusPost(rf) && rf.custbodyrsc_freight_carrier_consid) await voidAndStop();
+        if (isAusPost(rf) && rf.custbodyrsc_freight_carrier_consid && !wantAusPost) await voidAndStop();
       }
     }
     let consid = rf.custbodyrsc_freight_carrier_consid;
@@ -1305,6 +1337,40 @@
       ? '<a class="nsh-order-link" href="/app/accounting/transactions/transaction.nl?id=' + encodeURIComponent(p.rec.id) + '" target="_blank">' + esc(p.row.so) + "</a>"
       : esc(p.row.so);
 
+  // Every active shipping method, read from NetSuite once per page (25/11/2026: the check
+  // list's Method column is a dropdown, e.g. for Freeway VIP / Premium).
+  let methodList = null;
+  function shipMethods() {
+    if (methodList) return methodList;
+    try {
+      methodList = search("shipitem", [["isinactive", "is", "F"]], [col("itemid").setSort()]).map((r) => ({
+        id: r.getId(),
+        // NetSuite hands the names over HTML-escaped ("&lt;25kg"): undo that before showing them.
+        name: String(r.getValue("itemid")).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&"),
+      }));
+    } catch (e) {
+      methodList = [];
+    }
+    return methodList;
+  }
+  // Which courier rules a method follows (labels, Chill suburb check, pickup, sleeve code).
+  function courierOfMethod(name) {
+    const n = String(name || "").toUpperCase();
+    if (/CLICK/.test(n)) return "PICKUP";
+    if (/CHILL/.test(n)) return "CHILL";
+    if (/STARTRACK.*PREMIUM/.test(n)) return "STP";
+    if (/STARTRACK/.test(n)) return "STE";
+    if (/FREEWAY/.test(n)) return "FW";
+    return "OTHER"; // e.g. DHL, Australia Post, Custom: no courier-specific rules
+  }
+  function methodCell(p, i) {
+    if (p.action !== "ship" || p.push || !p.method) return esc(p.method ? p.method.name : "");
+    const list = shipMethods().slice();
+    if (!list.some((m) => m.id === p.method.id)) list.unshift(p.method);
+    return '<select class="nsh-ship-method" data-i="' + i + '" aria-label="Shipping method for ' + esc(p.row.so) + '">' +
+      list.map((m) => '<option value="' + esc(m.id) + '"' + (m.id === p.method.id ? " selected" : "") + ">" + esc(m.name) + "</option>").join("") + "</select>";
+  }
+
   const pkgText = (row) => [row.plt ? row.plt + " PLT" : "", row.ctn ? row.ctn + " CTN" : ""].filter(Boolean).join(" + ");
 
   function checkList(text) {
@@ -1326,14 +1392,17 @@
     const flagged = plans.filter((p) => p.action === "flag");
     const warned = toShip.filter((p) => p.warn.length);
     box.innerHTML =
-      '<table class="nsh-wave-table"><tr><th>Order</th><th>Customer</th><th>Method</th><th>Packages</th><th>Sleeve</th><th></th></tr>' +
+      '<table class="nsh-wave-table"><tr><th>Ship</th><th>Order</th><th>Customer</th><th>Method</th><th>Packages</th><th>Sleeve</th><th></th></tr>' +
       plans
         .map(
-          (p) =>
-            '<tr class="' + (p.action === "flag" ? "nsh-wave-bad" : p.action === "skip" ? "nsh-wave-wait" : "") + '"><td>' + orderLink(p) + "</td><td>" + esc(p.row.customer) +
-            "</td><td>" + esc(p.method ? p.method.name : "") + (p.push ? "<br>Store order, no packages: marked Shipped only" : p.row.isTO ? "<br>Store order: packing slip, not billed" : p.interflora ? "<br>Packing slip, not invoice" : "") +
-            "</td><td>" + esc(pkgText(p.row)) + "</td><td>" + esc(p.action === "ship" ? p.code : "") + "</td><td>" +
-            esc(p.action === "ship" ? (p.warn.join("; ") || "Ready") : (p.action === "flag" ? "Not shipped: " : "Skipped: ") + p.why) +
+          (p, i) =>
+            // Ship tick box (25/11/2026): ticked to start; untick to leave an order out of this run.
+            '<tr data-i="' + i + '" class="' + (p.action === "flag" ? "nsh-wave-bad" : p.action === "skip" ? "nsh-wave-wait" : "") + '"><td>' +
+            (p.action === "ship" ? '<input type="checkbox" class="nsh-ship-pick" checked aria-label="Ship ' + esc(p.row.so) + '">' : "") +
+            "</td><td>" + orderLink(p) + "</td><td>" + esc(p.row.customer) +
+            "</td><td>" + methodCell(p, i) + (p.push ? "<br>Store order, no packages: marked Shipped only" : p.row.isTO ? "<br>Store order: packing slip, not billed" : p.interflora ? "<br>Packing slip, not invoice" : "") +
+            "</td><td>" + esc(pkgText(p.row)) + '</td><td class="nsh-ship-sleeve">' + esc(p.action === "ship" ? p.code : "") + '</td><td><span class="nsh-ship-status">' +
+            esc(p.action === "ship" ? (p.warn.join("; ") || "Ready") : (p.action === "flag" ? "Not shipped: " : "Skipped: ") + p.why) + "</span>" +
             // Already shipped by someone (or a run that stopped early): their labels may not be out.
             (p.action === "ship" && p.skipLabels
               ? '<br><label class="nsh-ship-labels"><input type="checkbox" data-order="' + esc(p.row.so) + '"> Print labels too (they didn\'t print)</label>'
@@ -1342,9 +1411,9 @@
         )
         .join("") +
       "</table>" +
-      (toShip.some((p) => p.row.courier === "FW") ? '<p class="nsh-wave-hint">Freeway uses the Standard methods. Urgent Freeway (VIP or Premium) orders: take them off the list and do them by hand.</p>' : "") +
+      (toShip.some((p) => p.row.courier === "FW") ? '<p class="nsh-wave-hint">Freeway starts on the Standard methods. For urgent ones, pick VIP or Premium in the Method box.</p>' : "") +
       (toShip.length
-        ? '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-ship-dry"' + (localStorage.getItem(DRY_KEY) === "1" ? " checked disabled" : "") + "> Dry run (fill each order in, don't save anything)</label>" +
+        ? '<label class="nsh-print-stamp" id="nsh-ship-dry-row"' + (dryShown() ? "" : ' style="display:none"') + '><input type="checkbox" id="nsh-ship-dry"' + (localStorage.getItem(DRY_KEY) === "1" ? " checked disabled" : "") + "> Dry run (fill each order in, don't save anything)</label>" +
           '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-ship-go">' + (toShip.every((p) => p.row.isTO) ? "Ship " : "Ship and Bill ") + toShip.length + " Order" + (toShip.length > 1 ? "s" : "") + "</button></div>"
         : '<p class="nsh-wave-warn">Nothing to ship in this list.</p>');
     const msgs = [];
@@ -1352,13 +1421,48 @@
     if (warned.length) msgs.push("Check these before you start:\n" + warned.map((p) => "  " + p.row.so + ": " + p.warn.join("; ")).join("\n"));
     if (msgs.length) alert("Ship orders: check your list.\n\n" + msgs.join("\n\n"));
     const go = box.querySelector("#nsh-ship-go");
+    // Unticking an order greys its row, says "Left out" and updates the button's count.
+    const ticked = () => [...box.querySelectorAll(".nsh-ship-pick")].filter((cb) => cb.checked).map((cb) => plans[+cb.closest("tr").dataset.i]);
+    box.querySelectorAll(".nsh-ship-pick").forEach((cb) => {
+      const tr = cb.closest("tr");
+      const status = tr.querySelector(".nsh-ship-status");
+      const ready = status.textContent;
+      cb.addEventListener("change", () => {
+        tr.classList.toggle("nsh-ship-left-out", !cb.checked);
+        status.textContent = cb.checked ? ready : "Left out";
+        const list = ticked();
+        if (go) go.textContent = (list.length && list.every((x) => x.row.isTO) ? "Ship " : "Ship and Bill ") + list.length + " Order" + (list.length === 1 ? "" : "s");
+      });
+    });
+    // Method dropdowns: the order ships with the chosen method and follows its courier's rules.
+    box.querySelectorAll(".nsh-ship-method").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        const p = plans[+sel.dataset.i];
+        const m = shipMethods().find((x) => x.id === sel.value) || { id: sel.value, name: sel.options[sel.selectedIndex].text };
+        p.method = { id: m.id, name: m.name };
+        p.methodChosen = true;
+        p.row.courier = courierOfMethod(m.name, p.row.courier);
+        p.code = sleeveCode(p.row);
+        const tr = sel.closest("tr");
+        const sleeve = tr.querySelector(".nsh-ship-sleeve");
+        if (sleeve) sleeve.textContent = p.code;
+        if ((p.row.courier === "STE" || p.row.courier === "STP") && p.row.plt) alert("Ship orders: " + p.row.so + " has pallets, and Ready Freight won't take pallets on StarTrack (22 kg limit). Pick another method or untick it.");
+      });
+    });
     if (go)
       go.onclick = () => {
+        const list = ticked();
+        if (!list.length) return alert("Ship orders: no orders are ticked.");
+        plans.forEach((p) => {
+          if (p.action === "ship" && !list.includes(p)) Object.assign(p, { action: "skip", why: "Left out of this run" });
+        });
         box.querySelectorAll(".nsh-ship-labels input").forEach((cb) => {
           const p = plans.find((x) => x.row.so === cb.dataset.order);
           if (p) p.skipLabels = !cb.checked;
         });
-        start(plans, text, box.querySelector("#nsh-ship-dry").checked || localStorage.getItem(DRY_KEY) === "1");
+        // A hidden Dry run box never counts (it can't be seen, so it can't be meant).
+        const dryBox = box.querySelector("#nsh-ship-dry");
+        start(plans, text, (dryShown() && dryBox && dryBox.checked) || localStorage.getItem(DRY_KEY) === "1");
       };
   }
 
@@ -1460,7 +1564,7 @@
   function drawJob(work, title) {
     fill(
       title,
-      '<table class="nsh-wave-table"><tr><th>Order</th><th>Customer</th><th>Sleeve</th><th>Connote</th><th>Invoice</th><th></th></tr>' +
+      '<table class="nsh-wave-table"><tr><th>Ship</th><th>Order</th><th>Customer</th><th>Sleeve</th><th>Connote</th><th>Invoice</th><th></th></tr>' +
         work
           .map((p) => {
             const cls = p.result === "failed" ? "nsh-wave-bad" : p.result ? "" : "nsh-wave-wait";
@@ -1574,7 +1678,7 @@
         : "") +
       (failed.length ? '<button type="button" id="nsh-ship-retry">Retry Failed</button>' : "") +
       (dry && localStorage.getItem(DRY_KEY) !== "1" && work.some((p) => p.result === "dry")
-        ? '<button type="button" class="nsh-primary" id="nsh-ship-real">Ship and Bill for Real</button>'
+        ? '<button type="button" class="nsh-primary" id="nsh-ship-real">' + (work.every((w) => w.row.isTO) ? "Ship" : "Ship and Bill") + (dryShown() ? " for Real" : "") + "</button>"
         : "") +
       '<button type="button" id="nsh-ship-new">New List</button></div>' +
       (!dry && done.length
@@ -1599,6 +1703,20 @@
         try {
           const rows = parseRows(text);
           fresh = plan(rows, lookup([...new Set(rows.map((r) => r.so))]));
+          // Orders unticked before the dry run stay left out.
+          const leftOut = new Set(plans.filter((x) => x.why === "Left out of this run").map((x) => x.row.so));
+          fresh.forEach((x) => {
+            if (x.action === "ship" && leftOut.has(x.row.so)) Object.assign(x, { action: "skip", why: "Left out of this run" });
+          });
+          // Methods picked in the dropdown before the dry run carry over too.
+          plans.filter((x) => x.methodChosen).forEach((old) => {
+            const x = fresh.find((f) => f.row.so === old.row.so && f.action === "ship" && !f.push);
+            if (!x) return;
+            x.method = old.method;
+            x.methodChosen = true;
+            x.row.courier = old.row.courier;
+            x.code = sleeveCode(x.row);
+          });
         } catch (err) {
           alert("Ship orders: couldn't look the orders up in NetSuite again. Refresh the page and try again.");
           return;
@@ -1628,7 +1746,7 @@
   // ---------- start ----------
 
   if (window.__nshShipTest) {
-    Object.assign(window.__nshShipTest, { parseRows, methodFor, sleeveCode, sameCustomer, plan, pasteBack, family, stateFromPostcode, badState, stateCodeOf, fixState, queuePrint, flushPrints, restoreJob, chillCheck, suburbKey });
+    Object.assign(window.__nshShipTest, { courierOfMethod, parseRows, methodFor, sleeveCode, sameCustomer, plan, pasteBack, family, stateFromPostcode, badState, stateCodeOf, fixState, queuePrint, flushPrints, restoreJob, chillCheck, suburbKey });
     return;
   }
   // For checking the suburb/postcode rules against the live Chill list (read-only).

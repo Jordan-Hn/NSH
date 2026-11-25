@@ -1,5 +1,5 @@
 {
-    "version":  "0.23.3",
+    "version":  "0.24.2",
     "files":  [
                   {
                       "path":  "autoprint\\AutoPrint.ps1",
@@ -239,7 +239,7 @@
                   },
                   {
                       "path":  "content.css",
-                      "sha256":  "175C61AE7B638981275686520EDC83EF8B457D0567D2F52D6A2529ADDA4E339A"
+                      "sha256":  "07BDF53AE39730844CE90EDA88C4459F1E1CD6BF482C856F8F5587B123810BE0"
                   },
                   {
                       "path":  "content.js",
@@ -275,7 +275,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "988193AD88861680AD2B719F591871CF9D3A3280C4F8D76EC5AB22816FA47267"
+                      "sha256":  "3ED9A8187167D4CB9F7D3DF4E5863AF1091C830B220D9593AE8DC714116318D6"
                   },
                   {
                       "path":  "orders.js",
@@ -287,7 +287,7 @@
                   },
                   {
                       "path":  "ship.js",
-                      "sha256":  "5D9FE4538F62A0A020E8B5E0ECAFF464F78BBBEE257CAD22CED6F7A6B8BEE1A3"
+                      "sha256":  "878C5C199B0AB504BEAA014956A1B3C22C8940DFA6286169F465244310BCB9BD"
                   },
                   {
                       "path":  "slip.html",
@@ -303,12 +303,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "A12EE16F006CC12D04B6FED95A3582E4235BA972C46673CC409DF3CC9CC928B0"
+                      "sha256":  "D8C2DB47C70E300D9B1F5BD51AF56414B7C8CD9E707DF4531F2725038DB00CB4"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "F82462DA01C159D438E6B210AF08B61ACFD99C6C680AAD62D98933DA48FBF797"
                   }
               ],
-    "signature":  "D3FuSr7TMI7AUlmuK9ROfO+L1TvIQ0AmCXv0zlS9RbLT3bB6eku7Ec0annlomZ+1gPc7tXxsNMwmzSPoO37yqSpauxBycU8FCT5a+X33KVCb0x3zNyK0xr2towbwgcYiYh00SbGC5hkP+G2g0+1wNtbKjJ9UotARTjZYt/Qr1sE4VVObKMElPIPOwQhUVz9jSVxcTR5VmrGXEp6SLiLj7+aGVcPVvKEY3/0RLxoxQqJk4aCPlHTyGPy2gR+pce3xR+fX61aKx0rilXUJmbh7zh8M4UqE8aQgFf5DN90BFQscifJPaTi+dbW2liYF40EMR6DUJX0NjK4vaYzTJMFNIYyPurMVwDvKv8ZqfzKT+JrwpNKMz0X6DUhm6X+wWwB8l8vt5H/tW4RCRc+K9H+D4w0vtxs0zmF9extzWx0yigoX1QJM/50qcBySDK6rZd86SpqrP17NcDMrhscOUAOOCDnPrU9nKqwRCekkAvC/IGn+3LEdXqW5cCqcaILmgaYi"
+    "signature":  "o2hNVR34akAgBD2gLLw2uXiVIixR5L+oyHSLMp8FLN2oR12rMyqz9unxUb3X/JXMBPy7xuXlUUIpM1iqKR0XDtIIbEfdGJuvoabCu/RHLLlgE1iwB1EvZcXtAbR3DN0v/y17anISaKwRxkcyH2k6fJfMV1/9WTSm2Dzk5VcrmgbbwLuHuwQ/hY3RZYUphimHV20ZXFaDVtW1ZIfECsz+ASK6dbrspUDdZiL7+FiNoeRbrHgIVl2sGKxTT9O5Q4uod0eP/B/FszmQLIJvMKmNBmwRN6ubl6B3W7I4euSnLM1XDqB/9nNa3zGqv3gOKUMMviN0YXSJYphgDZNDCWo5nGGwKjPdTc33HU5lEBrFRmdMpzUh5z+GLu5VhGZ5Y/4qZm8PO21frcW+S3KpSOpDunQkwTxPPMKCfDLXBFKSrD/gPXxUh77CPlIW1iRj/+4J5uExN8DTUbu81SZEhfURhlMNwVPmI3cDquENr8qBicykYObRNqW3q1hEko4QF1yD"
 }
