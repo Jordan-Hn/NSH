@@ -258,11 +258,11 @@ function isPackingSlip(url) {
   try {
     const u = new URL(url);
     if (!u.hostname.endsWith(".netsuite.com")) return false;
-    if (/\/print\/hotprint\.nl$/i.test(u.pathname)) return /packingslip/i.test(u.searchParams.get("printtype") || "");
+    if (/\/print\/hotprint\.nl$/i.test(u.pathname)) return /packingslip|pickingticket/i.test(u.searchParams.get("printtype") || "");
     // The print icon's form page: only when it says it's a packing slip (or says nothing).
     if (!/nlsprintform\.nl$/i.test(u.pathname)) return false;
     const type = u.searchParams.get("printtype");
-    return !type || /packingslip/i.test(type);
+    return !type || /packingslip|pickingticket/i.test(type);
   } catch {
     return false;
   }
@@ -283,7 +283,7 @@ async function tidiedPackingSlipB64(tab) {
   if (!b64) return null;
   const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   if (String.fromCharCode(...raw.slice(0, 5)) !== "%PDF-") return null;
-  const fixed = await self.nshFixPackingSlip(raw);
+  const fixed = (await self.nshFixPackingSlip(raw)) || (await self.nshFixPickingTicket(raw));
   if (!fixed) return null;
   let bin = "";
   for (let i = 0; i < fixed.length; i += 0x8000) bin += String.fromCharCode.apply(null, fixed.subarray(i, i + 0x8000));

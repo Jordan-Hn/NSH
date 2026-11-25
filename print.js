@@ -223,6 +223,13 @@
     if (!resp.ok) throw new Error("NetSuite answered " + resp.status);
     const bytes = new Uint8Array(await resp.arrayBuffer());
     if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") throw new Error("NetSuite didn't send a PDF (logged out?)");
+    // Tidy the crowded header block (lib/packingslip-fix.js); any problem = the ticket as NetSuite made it.
+    try {
+      const tidy = window.nshFixPickingTicket && (await window.nshFixPickingTicket(bytes));
+      if (tidy) return tidy;
+    } catch (e) {
+      console.warn("[NetSuite Helper] ticket tidy skipped", e);
+    }
     return bytes;
   }
 

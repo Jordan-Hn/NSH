@@ -1,5 +1,5 @@
 {
-    "version":  "0.22.9",
+    "version":  "0.23.3",
     "files":  [
                   {
                       "path":  "autoprint\\AutoPrint.ps1",
@@ -231,7 +231,7 @@
                   },
                   {
                       "path":  "background.js",
-                      "sha256":  "6DFFF336106943D04ED8C1BD9B03E992158B8796AAB67ED4586E28173B51FC63"
+                      "sha256":  "C56F80028A478B7682499EB518F7F4F00627B357F9D70E2A05C60D00FFD5B5FE"
                   },
                   {
                       "path":  "bulkopen.js",
@@ -263,7 +263,7 @@
                   },
                   {
                       "path":  "lib\\packingslip-fix.js",
-                      "sha256":  "8321E0611A1B8DBE16853BB42A1B79FD5C9FB1D6817DAA68B52DF5F55F368AB2"
+                      "sha256":  "F53A51BB222957A8DE2504B113D1B731A2CA9CE897DEF7AC5C08C5A81E734F63"
                   },
                   {
                       "path":  "lib\\pdf-lib.min.js",
@@ -275,7 +275,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "5448B8682EA58865C32B362B8E233778D6121F7B32E69F9F5264A6F9E21D6745"
+                      "sha256":  "988193AD88861680AD2B719F591871CF9D3A3280C4F8D76EC5AB22816FA47267"
                   },
                   {
                       "path":  "orders.js",
@@ -283,7 +283,7 @@
                   },
                   {
                       "path":  "print.js",
-                      "sha256":  "3219B9B8B1D51465B0954C3F8D7E15CFA9FF59A2432CFE62F8B0A366483547FD"
+                      "sha256":  "AD2D03975B807FD96F4524AF4FB831D9CC5BB2E53CCDBF528ACF31CBDA7DEA29"
                   },
                   {
                       "path":  "ship.js",
@@ -303,12 +303,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "4969D2C966635D4CB9C6941066C1CEF5CB24FA7ADC39D7DF0B5D65568B97DA06"
+                      "sha256":  "A12EE16F006CC12D04B6FED95A3582E4235BA972C46673CC409DF3CC9CC928B0"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "F82462DA01C159D438E6B210AF08B61ACFD99C6C680AAD62D98933DA48FBF797"
                   }
               ],
-    "signature":  "qNcsi9C3Xs80FcMdgZkjt2SBVxyiRYoXxJ/ldoS91NLzilkwsimdP+ZbDF3ARNsC4J1T/00HyKh3+YIyJctrac3HVf0wVrT6X7wHJXI75uMtlT48smM3BAmiIw4uYWT7a75ET47eIUkpYHc9eTCX8oSFyK4xkpDrS2sHEsjF5Rj2Lmhm32vMwpQxM2zHe+rCAwL+9yKFi+HcEBixHjuAiHnc0jDINEO9ZKo245JbKE4QvLGf2Ak+Uaur1AHsRo9eXh3KRRvAKGjUEBU0erpNkxPXmOpAp1yN+h9w1KlhS72ElQk75gnAK40+9BDVTiaAfF7Hkv5xYUky721URdwiiRrFf2/bMFAC4Lkfs6WoGHSoszg5s6GbLQxjYa6OiKx7vrAPf19HvpoxZbDvs0CVsbkDf4uBrScBtqG1c5QNVRCDKla4rxqU7lxopo1Nc3Z2gVv3I0Sxicp5GJu8la6ZgGgH18oj2fI/ISb9Sy5upbpiDIjJaIaLWUaAl494TTQ/"
+    "signature":  "D3FuSr7TMI7AUlmuK9ROfO+L1TvIQ0AmCXv0zlS9RbLT3bB6eku7Ec0annlomZ+1gPc7tXxsNMwmzSPoO37yqSpauxBycU8FCT5a+X33KVCb0x3zNyK0xr2towbwgcYiYh00SbGC5hkP+G2g0+1wNtbKjJ9UotARTjZYt/Qr1sE4VVObKMElPIPOwQhUVz9jSVxcTR5VmrGXEp6SLiLj7+aGVcPVvKEY3/0RLxoxQqJk4aCPlHTyGPy2gR+pce3xR+fX61aKx0rilXUJmbh7zh8M4UqE8aQgFf5DN90BFQscifJPaTi+dbW2liYF40EMR6DUJX0NjK4vaYzTJMFNIYyPurMVwDvKv8ZqfzKT+JrwpNKMz0X6DUhm6X+wWwB8l8vt5H/tW4RCRc+K9H+D4w0vtxs0zmF9extzWx0yigoX1QJM/50qcBySDK6rZd86SpqrP17NcDMrhscOUAOOCDnPrU9nKqwRCekkAvC/IGn+3LEdXqW5cCqcaILmgaYi"
 }
