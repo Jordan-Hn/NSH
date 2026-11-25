@@ -1,5 +1,5 @@
 {
-    "version":  "0.25.6",
+    "version":  "0.25.8",
     "files":  [
                   {
                       "path":  "autobill.js",
@@ -243,7 +243,7 @@
                   },
                   {
                       "path":  "content.css",
-                      "sha256":  "B52D8A45221E67A7697CBA8D6410C168350FF1788490E1B251786DA56059FAC9"
+                      "sha256":  "20A0B0E971AC70237EDB97A117E41D9DBB66C123C2210B5CD02C181244C1EA3C"
                   },
                   {
                       "path":  "content.js",
@@ -279,7 +279,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "51DA2E8F3A49E2BC750458D82E694BD179C286294B7A8B7C0524CA41A6EC81E3"
+                      "sha256":  "EE05A31BA1479AEFB833CA572EBA30BCC9F87E74A727E66DBDD5BCE681B5BE6A"
                   },
                   {
                       "path":  "orders.js",
@@ -291,7 +291,7 @@
                   },
                   {
                       "path":  "ship.js",
-                      "sha256":  "1775347965F30B58893275F96988A9505FCA0DDBC5DF0E50C57A3572E5225C52"
+                      "sha256":  "4D547652DFD09159783A6D2768786236691C0ADCAA427A5CB87D25FDD7DE6735"
                   },
                   {
                       "path":  "slip.html",
@@ -307,12 +307,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "EA0040BBAB7A2518FBA97EDF99D75F657977C96D6C5970E4C3A4B70529464E59"
+                      "sha256":  "E5CB48E946CB21E0E2378407809D4A28C00638A55018EDA2E3BF8E0C5136F4E0"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "F82462DA01C159D438E6B210AF08B61ACFD99C6C680AAD62D98933DA48FBF797"
                   }
               ],
-    "signature":  "WLTM3OmaiIGKEKJp+cEC7JPBzwDU8NixEu8mgE3N7dybM17P8bQWSXcDBECU6s/RVkqZIBM02DFhXA615hiQ1sR1YF/fTaQyNUHoc+kfAC03MonyMShWrk6sgpyon/GdIsgVWb+tdesR5qTbwQvkBxALsq3vodveVKTfAEyuJNw08M/oMhSHmb8VhOu/Ueib4IwvUbkFoWmK1oVo8Y0YGVB4GrSf1KBfaOYJVoeocW3ZwWSVssSO2dWJc9zhuNsnNhDipjI8Yk71P1bbQ9upbYk/E3stwbHPDhsi6XDRnhTXKd4XezGOh581ldvfH9GcHqeGCwYAWUQ5yhXL/dPCgzK/6C566UeaPp3950EjtAX2Z8QLoNz4IBb+a8BxbW/avm7Qw9G/AEJmgmddPi0oniUdxRxuDIBp1aRsLJZmKRxlca/DP0EJnbWFC717snWJOmMXQXopGko3nqDL5VKxE1ekATLbfbYowa56sGbpvPEMCimh0HEASYggoMoCT2rI"
+    "signature":  "oJ/UeDWiTO/YPTiNG/EebRNt62SZ7aL77QFk61SaeMcDTgy4RVoNY9q3TfPxsNyAoxEagwuKayuPVBWhcG1DOeLhzMTjU4dcrk4HH+xKwjmdabH19xO8DM/3vmcz4PtJCIl/DNJeOa2tmq67Nu1ewQ2bWRJGG/AtAlVqA4yucVwTPTaY3X+kAin+2Pu6XbDzuHkzGEtApRfqp7ZaaPsgDteHFbnegwNlEELsywN2iXOBSUJgCII41srWS6z2HFsNNf/L4Cl1k24UmrapIs8e1fPb1I7OWg2H4zlQw+VzlhPoooggOImQk5+n50GjUIuaFXj9KqWMTu+cxmy5wfvjiHaFWZcjRZjDj66NGruteNkBYHhHNzUiHRnDEpS4zkvW4ivF0dCze7x5Yo1SGylcmI4nowftNJyytQmmySOhR218mJJ4mKPgYDnaM6iACc7qajitW3QAKCvZyz3asmdTeJ7xl1sTrAvmA97TZKwa2Fa1iojvlkf44J521bk4vX7V"
 }

@@ -35,6 +35,16 @@
   const INVOICE_FORM = "195";
   const KBH = "Warehouses : KBH Warehouse";
   const DRY_KEY = "nshShipDryRun"; // "1" = fill in, never save (tests)
+  // Manual print (26/11/2026): "0" = don't send paperwork to AutoPrint; it's put into two
+  // PDFs at the end instead (labels; invoices and packing slips), in pasted order.
+  const AP_KEY = "nshShipAutoPrint";
+  const autoPrintOn = () => {
+    try {
+      return localStorage.getItem(AP_KEY) !== "0";
+    } catch (e) {
+      return true;
+    }
+  };
   // The Dry run tick box is only for testing (25/11/2026): hidden unless this browser has it
   // switched on. Alt+Shift+D on the Ship Orders page shows / hides it (remembered).
   const DRY_SHOW_KEY = "nshShowDryRun";
@@ -602,6 +612,32 @@
   async function autoPrintUrl(url, name) {
     const res = await toExtension("nsh-autoprint-url", { name, url });
     if (!res.ok) throw new Error("AutoPrint: " + res.error);
+  }
+
+  // ---------- manual print: two PDFs at the end ----------
+
+  let manualPdfs = null;
+  async function mergeForManual(jobs) {
+    const P = window.PDFLib;
+    const out = { labels: null, papers: null, missed: [] };
+    const groups = { labels: jobs.filter((j) => /^Labels_/.test(j.name)), papers: jobs.filter((j) => !/^Labels_/.test(j.name)) };
+    for (const k of Object.keys(groups)) {
+      if (!groups[k].length) continue;
+      const doc = await P.PDFDocument.create();
+      let n = 0;
+      for (const j of groups[k]) {
+        try {
+          const bytes = j.bytes || (await fetchPdf(j.url));
+          const src = await P.PDFDocument.load(bytes);
+          (await doc.copyPages(src, src.getPageIndices())).forEach((pg) => doc.addPage(pg));
+          n++;
+        } catch (e) {
+          out.missed.push(j.name);
+        }
+      }
+      if (n) out[k] = { url: URL.createObjectURL(new Blob([await doc.save()], { type: "application/pdf" })), count: n };
+    }
+    return out;
   }
 
   // ---------- printing in pasted order ----------
@@ -1584,6 +1620,7 @@
       (toShip.some((p) => p.row.courier === "FW") ? '<p class="nsh-wave-hint">Freeway starts on the Standard methods. For urgent ones, pick VIP or Premium in the Method box.</p>' : "") +
       (toShip.length
         ? '<label class="nsh-print-stamp" id="nsh-ship-dry-row"' + (dryShown() ? "" : ' style="display:none"') + '><input type="checkbox" id="nsh-ship-dry"' + (localStorage.getItem(DRY_KEY) === "1" ? " checked disabled" : "") + "> Dry run (fill each order in, don't save anything)</label>" +
+          '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-ship-autoprint"' + (autoPrintOn() ? " checked" : "") + "> Send paperwork to AutoPrint</label>" +
           '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-ship-go">' + (toShip.every((p) => p.row.isTO) ? "Ship " : "Ship and Bill ") + toShip.length + " Order" + (toShip.length > 1 ? "s" : "") + "</button></div>"
         : '<p class="nsh-wave-warn">Nothing to ship in this list.</p>');
     const msgs = [];
@@ -1631,6 +1668,11 @@
           if (p) p.skipLabels = !cb.checked;
         });
         // A hidden Dry run box never counts (it can't be seen, so it can't be meant).
+        const apBox = box.querySelector("#nsh-ship-autoprint");
+        if (apBox)
+          try {
+            localStorage.setItem(AP_KEY, apBox.checked ? "1" : "0");
+          } catch (e) {}
         const dryBox = box.querySelector("#nsh-ship-dry");
         start(plans, text, (dryShown() && dryBox && dryBox.checked) || localStorage.getItem(DRY_KEY) === "1");
       };
@@ -1644,12 +1686,14 @@
   async function start(plans, text, dry) {
     const work = plans.filter((p) => p.action === "ship");
     if (!dry) {
-      const notReady = await helperReady();
+      const manual = !autoPrintOn();
+      const notReady = manual ? "" : await helperReady();
       if (notReady) {
-        alert("Ship orders: AutoPrint isn't ready, so labels and invoices wouldn't print. Nothing was shipped.\n\n" + notReady);
+        alert("Ship orders: AutoPrint isn't ready, so labels and invoices wouldn't print. Nothing was shipped.\n\n" + notReady + "\n\nTo print them yourself instead, untick Send paperwork to AutoPrint.");
         return;
       }
-      if (!confirm("Ship and bill " + work.length + " order" + (work.length > 1 ? "s" : "") + " in NetSuite now?\n\nLabels and invoices print through AutoPrint as each order finishes.")) return;
+      const how = manual ? "Labels and invoices go into two PDFs at the end for you to print." : "Labels and invoices print through AutoPrint as each order finishes.";
+      if (!confirm("Ship and bill " + work.length + " order" + (work.length > 1 ? "s" : "") + " in NetSuite now?\n\n" + how)) return;
     }
     if (typeof window.PDFLib === "undefined") {
       alert("Ship orders: the PDF tool didn't load. Reload the extension and refresh this page.");
@@ -1741,7 +1785,7 @@
             const link = p.iff ? ' <a href="/app/accounting/transactions/itemship.nl?id=' + esc(p.iff.id) + '" target="_blank">' + esc(p.iff.tranid) + "</a>" : "";
             // Customer as pasted from the tracker (NetSuite's name if the row had none).
             const customer = p.row.customer || (p.rec && p.rec.customer) || "";
-            return '<tr class="' + cls + '"><td>' + orderLink(p) + link + "</td><td>" + esc(customer) + "</td><td>" + esc(p.code) + "</td><td>" + copyable(p.connote) + "</td><td>" + copyable(p.invoice && p.invoice.tranid) + "</td><td>" + esc(p.note || "Waiting") + "</td></tr>";
+            return '<tr class="' + cls + '"><td>' + orderLink(p) + link + (pkgText(p.row) ? '<br><span class="nsh-ship-pkgs">' + esc(pkgText(p.row)) + "</span>" : "") + "</td><td>" + esc(customer) + "</td><td>" + esc(p.code) + "</td><td>" + copyable(p.connote) + "</td><td>" + copyable(p.invoice && p.invoice.tranid) + "</td><td>" + esc(p.note || "Waiting") + "</td></tr>";
           })
           .join("") +
         "</table><div id=\"nsh-ship-after\"></div>"
@@ -1773,6 +1817,11 @@
       }
     });
     let finishedCount = work.length - todo.length;
+    // Manual print: paperwork is collected here (still in pasted order) instead of sent.
+    const manual = !dry && !autoPrintOn();
+    const collected = [];
+    const send = manual ? async (job) => collected.push(job) : undefined;
+    manualPdfs = null;
     const title = () => (dry ? "Dry Run: " : "Shipping: ") + finishedCount + " of " + work.length + " done";
     let nextTodo = 0;
     // If NetSuite still says its usage limit was hit, no more orders are started: the
@@ -1787,7 +1836,7 @@
         work[k].finished = true;
         finishedCount++;
         draw(title());
-        flushPrints(work, draw, title);
+        flushPrints(work, draw, title, send);
       }
     };
     await Promise.all(Array.from({ length: Math.min(WORKERS, todo.length) }, (_, slot) => worker(slot)));
@@ -1795,7 +1844,14 @@
       todo.slice(nextTodo).forEach((k) => {
         Object.assign(work[k], { result: "failed", finished: true, note: "Not started: NetSuite's usage limit was hit. Use Retry Failed." });
       });
-    await flushPrints(work, draw, title);
+    await flushPrints(work, draw, title, send);
+    if (manual && collected.length) {
+      try {
+        manualPdfs = await mergeForManual(collected);
+      } catch (err) {
+        alert("Ship orders: couldn't put the paperwork into PDFs: " + err.message + "\n\nThe orders themselves are fine. Print the paperwork from NetSuite.");
+      }
+    }
 
     async function oneOrder(p, slot) {
       p.lastStep = "";
@@ -1855,6 +1911,8 @@
           '<button type="button" id="nsh-ship-copy-both">Copy Orders + Connotes</button>' +
           '<button type="button" id="nsh-ship-copy">Copy Rows</button>'
         : "") +
+      (manualPdfs && manualPdfs.labels ? '<button type="button" class="nsh-primary" id="nsh-ship-pdf-labels">Open Labels PDF (' + manualPdfs.labels.count + ")</button>" : "") +
+      (manualPdfs && manualPdfs.papers ? '<button type="button" class="nsh-primary" id="nsh-ship-pdf-papers">Open Invoices and Packing Slips PDF (' + manualPdfs.papers.count + ")</button>" : "") +
       (failed.length ? '<button type="button" id="nsh-ship-retry">Retry Failed</button>' : "") +
       (dry && localStorage.getItem(DRY_KEY) !== "1" && work.some((p) => p.result === "dry")
         ? '<button type="button" class="nsh-primary" id="nsh-ship-real">' + (work.every((w) => w.row.isTO) ? "Ship" : "Ship and Bill") + (dryShown() ? " for Real" : "") + "</button>"
@@ -1906,10 +1964,15 @@
         if (!fresh.some((p) => p.action === "ship")) return;
         await start(fresh, text, false);
       };
+    [["#nsh-ship-pdf-labels", "labels"], ["#nsh-ship-pdf-papers", "papers"]].forEach(([sel, k]) => {
+      const b = after.querySelector(sel);
+      if (b) b.onclick = () => window.open(manualPdfs[k].url, "_blank");
+    });
     const retry = after.querySelector("#nsh-ship-retry");
     if (retry) retry.onclick = () => run(plans, work, text, dry);
     after.querySelector("#nsh-ship-new").onclick = () => renderInput("");
     if (quiet) return;
+    if (manualPdfs && manualPdfs.missed.length) alert("Ship orders: these couldn't go into the PDFs, so print them from NetSuite:\n\n" + manualPdfs.missed.join("\n"));
     const printProblems = work.filter((p) => p.printError);
     if (printProblems.length) {
       alert("Ship orders: some paperwork didn't print (the orders themselves are fine):\n\n" + printProblems.map((p) => p.row.so + ": " + p.printError).join("\n") + "\n\nPrint these by hand, or check AutoPrint is running.");
@@ -1926,7 +1989,7 @@
   // ---------- start ----------
 
   if (window.__nshShipTest) {
-    Object.assign(window.__nshShipTest, { courierOfMethod, parseRows, methodFor, sleeveCode, sameCustomer, plan, pasteBack, family, stateFromPostcode, badState, stateCodeOf, fixState, queuePrint, flushPrints, restoreJob, chillCheck, suburbKey });
+    Object.assign(window.__nshShipTest, { courierOfMethod, parseRows, methodFor, sleeveCode, sameCustomer, plan, pasteBack, family, stateFromPostcode, badState, stateCodeOf, fixState, queuePrint, flushPrints, mergeForManual, restoreJob, chillCheck, suburbKey });
     return;
   }
   // For checking the suburb/postcode rules against the live Chill list (read-only).

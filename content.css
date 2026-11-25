@@ -410,3 +410,5 @@ select.nsh-ship-method:focus { outline: 2px solid #607799; outline-offset: 1px; 
 .nsh-wave-panel textarea#nsh-print-input,
 .nsh-wave-panel textarea#nsh-wave-input { width: 760px; max-width: calc(100% - 8px); min-height: 150px; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
 .nsh-wave-panel textarea#nsh-open-input { width: 420px; max-width: calc(100% - 8px); }
+/* Ship Orders progress table: packages under the order number (26/11/2026) */
+.nsh-ship-pkgs { color: #666; font-size: 11px; white-space: nowrap; }
