@@ -259,7 +259,10 @@ function isPackingSlip(url) {
     const u = new URL(url);
     if (!u.hostname.endsWith(".netsuite.com")) return false;
     if (/\/print\/hotprint\.nl$/i.test(u.pathname)) return /packingslip/i.test(u.searchParams.get("printtype") || "");
-    return /nlsprintform\.nl$/i.test(u.pathname);
+    // The print icon's form page: only when it says it's a packing slip (or says nothing).
+    if (!/nlsprintform\.nl$/i.test(u.pathname)) return false;
+    const type = u.searchParams.get("printtype");
+    return !type || /packingslip/i.test(type);
   } catch {
     return false;
   }
@@ -271,8 +274,8 @@ async function fetchPdfB64(pdfUrl) {
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   return btoa(bin);
 }
-// Returns a data: URL of the tidied packing slip, or null to print it as it is.
-async function tidiedPackingSlip(tab) {
+// The tidied packing slip as base64, or null (not a slip with the overlap, or no NetSuite tab).
+async function tidiedPackingSlipB64(tab) {
   const helperTab = await netsuiteTabFor(tab);
   if (helperTab == null) return null;
   const [res] = await withTimeout(chrome.scripting.executeScript({ target: { tabId: helperTab }, world: "MAIN", func: fetchPdfB64, args: [tab.url] }), 10000);
@@ -284,10 +287,75 @@ async function tidiedPackingSlip(tab) {
   if (!fixed) return null;
   let bin = "";
   for (let i = 0; i < fixed.length; i += 0x8000) bin += String.fromCharCode.apply(null, fixed.subarray(i, i + 0x8000));
-  return "data:application/pdf;base64," + btoa(bin);
+  return btoa(bin);
+}
+// Returns a data: URL of the tidied packing slip, or null to print it as it is.
+async function tidiedPackingSlip(tab) {
+  const b64 = await tidiedPackingSlipB64(tab);
+  return b64 ? "data:application/pdf;base64," + b64 : null;
 }
 
+// Packing slips look tidied on screen too (25/11/2026): once a NetSuite packing slip tab
+// has loaded, it's swapped to slip.html showing the tidied copy (Chrome's PDF viewer, so
+// its print button prints the tidied one). The Auto Print button prints from slip.html.
+// slip.html#<key>|<NetSuite link>: the link lets it fetch again after the browser forgets.
+const VIEWER = chrome.runtime.getURL("slip.html");
+const slipCache = new Map(); // key -> { b64, name }
+const slipSwapped = new Set(); // tabId|url already swapped (Back shows NetSuite's version)
+function rememberSlip(key, entry) {
+  slipCache.set(key, entry);
+  while (slipCache.size > 30) slipCache.delete(slipCache.keys().next().value);
+}
+async function slipEntry(hash) {
+  const bar = hash.indexOf("|");
+  const key = bar >= 0 ? hash.slice(0, bar) : hash;
+  if (slipCache.has(key)) return slipCache.get(key);
+  const original = bar >= 0 ? decodeURIComponent(hash.slice(bar + 1)) : "";
+  if (!isPackingSlip(original)) return null;
+  const b64 = await tidiedPackingSlipB64({ url: original });
+  if (!b64) return null;
+  const entry = { b64, name: "PackingSlip.pdf" };
+  rememberSlip(key, entry);
+  return entry;
+}
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (info.status !== "complete" || !tab.url || !isPackingSlip(tab.url) || /#nsh-original$/.test(tab.url)) return;
+  const seen = tabId + "|" + tab.url;
+  if (slipSwapped.has(seen)) return;
+  slipSwapped.add(seen);
+  try {
+    const b64 = await tidiedPackingSlipB64(tab);
+    if (!b64) return; // nothing to tidy: leave NetSuite's slip as it is
+    const key = Date.now().toString(36) + tabId;
+    rememberSlip(key, { b64, name: tab.title || "PackingSlip.pdf" });
+    const now = await chrome.tabs.get(tabId);
+    if (now.url !== tab.url) return; // moved on meanwhile
+    await chrome.tabs.update(tabId, { url: VIEWER + "#" + key + "|" + encodeURIComponent(tab.url) });
+  } catch (e) {
+    console.warn("Packing slip on screen not tidied:", e);
+  }
+});
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || msg.type !== "nsh-slip-get" || !sender.url || !sender.url.startsWith(VIEWER)) return;
+  slipEntry(String(msg.hash || "")).then(reply, () => reply(null));
+  return true;
+});
+
 chrome.action.onClicked.addListener(async (tab) => {
+  // The tidied packing slip viewer: print the tidied copy it shows.
+  if (tab.url && tab.url.startsWith(VIEWER)) {
+    checkHelper();
+    try {
+      const entry = await slipEntry(new URL(tab.url).hash.slice(1));
+      if (!entry) throw new Error("slip not found");
+      await chrome.downloads.download({ url: "data:application/pdf;base64," + entry.b64, filename: safeName(entry.name), saveAs: false, conflictAction: "uniquify" });
+      flash(tab.id, "OK", "#1b7f3b");
+    } catch (e) {
+      console.error(e);
+      flash(tab.id, "ERR", "#b00020");
+    }
+    return;
+  }
   if (!isAllowedSite(tab.url)) {
     flash(tab.id, "NS?", "#b00020");
     return;

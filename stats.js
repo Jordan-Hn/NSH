@@ -20,7 +20,10 @@
 (function () {
   "use strict";
 
-  if (!/[?&]searchid=146970(&|$)/.test(location.search)) return;
+  // The search's own results page, or the Home dashboard (its portlet of the same search, 25/11/2026).
+  const onResults = /[?&]searchid=146970(&|$)/.test(location.search);
+  const onHome = /\/app\/center\/card\.nl$/i.test(location.pathname);
+  if (!onResults && !onHome) return;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -41,7 +44,9 @@
 
   // The results table itself (the Summary uses the same NetSuite classes, so never
   // look rows or headers up across the whole page).
-  const resultsTable = () => document.getElementById("div__body") || document;
+  // On the Home page this points at the portlet's table while it's being worked on.
+  let ROOT = null;
+  const resultsTable = () => ROOT || document.getElementById("div__body") || document;
 
   function readRows() {
     const head = resultsTable().querySelector("tr.uir-list-headerrow");
@@ -212,7 +217,7 @@
     });
   }
   function groupRows(rows, t) {
-    if (!rows.length || document.querySelector("tr.nsh-group-row")) return;
+    if (!rows.length || rows[0].tr.parentNode.querySelector("tr.nsh-group-row")) return;
     const parent = rows[0].tr.parentNode;
     const width = rows[0].tr.cells.length;
     GROUP_ORDER.forEach((b) => {
@@ -233,18 +238,8 @@
     });
   }
 
-  function draw(rows, stock) {
-    const t = today();
-    const counts = {};
-    const depts = {};
-    rows.forEach((r) => {
-      const b = bucket(r, t);
-      counts[b] = (counts[b] || 0) + 1;
-      depts[r.dept || "(none)"] = (depts[r.dept || "(none)"] || 0) + 1;
-      r.tr.classList.toggle("nsh-overdue-row", b === "overdue");
-    });
-
-    // STOCK column, straight after AMOUNT (or after the last column if there's no AMOUNT).
+  // STOCK column, straight after AMOUNT (or after the last column if there's no AMOUNT).
+  function drawStock(rows, stock) {
     const head = resultsTable().querySelector("tr.uir-list-headerrow");
     const headNames = head ? [...head.cells].map((c) => c.innerText.trim().toUpperCase()) : [];
     let at = headNames.indexOf("AMOUNT");
@@ -279,6 +274,21 @@
           '<div class="nsh-stock-all">' + s.lines.map(esc).join("<br>") + "</div>";
       }
     });
+
+  }
+
+  function draw(rows, stock) {
+    const t = today();
+    const counts = {};
+    const depts = {};
+    rows.forEach((r) => {
+      const b = bucket(r, t);
+      counts[b] = (counts[b] || 0) + 1;
+      depts[r.dept || "(none)"] = (depts[r.dept || "(none)"] || 0) + 1;
+      r.tr.classList.toggle("nsh-overdue-row", b === "overdue");
+    });
+
+    drawStock(rows, stock);
 
     labelCells(rows);
 
@@ -941,6 +951,240 @@
     };
   }
 
+  // ---------- the Home dashboard portlet (25/11/2026) ----------
+  // The same saved search added to the Home page as a portlet gets the same look: sections
+  // by ship date, plain stripes, overdue in light red, the Stock column. A "Helper view"
+  // switch in the portlet's title bar turns it off and on (remembered per browser). No
+  // Summary or exports there: the portlet only shows one page of the search.
+  const HOME_KEY = "nshHomePendingView";
+  function homeOn() {
+    try {
+      return localStorage.getItem(HOME_KEY) !== "off";
+    } catch (e) {
+      return true;
+    }
+  }
+  const homePortlets = () =>
+    [...document.querySelectorAll(".ns-portlet-wrapper")].filter(
+      (w) => w.querySelector("a[href*='searchid=146970']") && w.querySelector("tr.uir-list-headerrow") && !w.querySelector(".nsh-home-header")
+    );
+  function addHomeSwitch(wrap) {
+    // In the filter row (next to TOTAL), which is always showing; the title bar's icons
+    // only appear on hover.
+    const bar = wrap.querySelector(".portletFilterBar") || wrap.querySelector(".ns-portlet-controls");
+    if (!bar || wrap.querySelector(".nsh-home-switch")) return;
+    const on = homeOn();
+    const sw = document.createElement("span");
+    sw.className = "nsh-home-switch" + (on ? " nsh-on" : "");
+    sw.setAttribute("role", "switch");
+    sw.setAttribute("aria-checked", String(on));
+    sw.tabIndex = 0;
+    sw.innerHTML = '<span class="nsh-home-switch-label">Helper view</span><span class="nsh-home-switch-pill"></span>';
+    const flip = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        localStorage.setItem(HOME_KEY, on ? "off" : "on");
+      } catch (err) {}
+      location.reload();
+    };
+    sw.addEventListener("click", flip);
+    sw.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && flip(e));
+    // The title bar is the portlet's drag handle: a click on the switch mustn't start a drag.
+    sw.addEventListener("mousedown", (e) => e.stopPropagation());
+    const right = document.createElement("span");
+    right.className = "nsh-home-right";
+    right.appendChild(sw);
+    bar.insertBefore(right, bar.firstChild);
+  }
+  // The Summary, squeezed into the portlet's filter row (between TOTAL and the switch):
+  // counts for the orders on this page, click to filter (several at once), Show all.
+  function drawHomeSummary(wrap, table, rows, stock) {
+    let cell = wrap.querySelector(".nsh-home-summary");
+    if (!cell) {
+      const total = [...wrap.querySelectorAll(".portletFilterBar td")].find((td) => /TOTAL:/i.test(td.textContent) && !td.querySelector("td"));
+      if (!total) return;
+      cell = document.createElement("td");
+      cell.className = "nsh-home-summary";
+      total.after(cell);
+      cell.addEventListener("click", (e) => {
+        const a = e.target.closest && e.target.closest("a[data-type], a.nsh-home-all");
+        if (!a) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (a.classList.contains("nsh-home-all")) filter = null;
+        else togglePick(a.dataset.type, a.dataset.value);
+        ROOT = table;
+        applyFilter(table.__nshRows, table.__nshStock, today());
+        ROOT = null;
+        drawHomeSummary(wrap, table, table.__nshRows, table.__nshStock);
+      });
+    }
+    table.__nshRows = rows;
+    table.__nshStock = stock;
+    const t = today();
+    const counts = {};
+    const depts = {};
+    rows.forEach((r) => {
+      const b = bucket(r, t);
+      counts[b] = (counts[b] || 0) + 1;
+      const d = r.dept || "(none)";
+      depts[d] = (depts[d] || 0) + 1;
+    });
+    const sc = { short: 0, check: 0, ready: 0 };
+    if (stock) rows.forEach((r) => stock[r.so] && sc[stock[r.so].state]++);
+    const stat = (type, value, label, n, bad) =>
+      n
+        ? '<span class="nsh-home-stat"><span class="nsh-home-stat-label">' + esc(label) + '</span><a href="#" class="nsh-stat' + (bad ? " nsh-stat-bad" : "") + (picked(type, value) ? " nsh-stat-on" : "") +
+          '" data-type="' + type + '" data-value="' + esc(value) + '">' + n + "</a></span>"
+        : "";
+    const group = (html) => (html ? '<span class="nsh-home-group">' + html + "</span>" : "");
+    cell.innerHTML =
+      group(["overdue", "today", "tomorrow", "later", "samples", "nodate"].map((b) => stat("bucket", b, LABELS[b], counts[b], b === "overdue")).join("")) +
+      group(stock ? stat("stock", "short", "Stock short", sc.short, true) + stat("stock", "ready", "Stock ready", sc.ready) + stat("stock", "check", "Stock to check", sc.check) : '<span class="nsh-home-stat"><span class="nsh-home-stat-label">Stock</span><span class="nsh-stat-zero">Checking...</span></span>') +
+      group(Object.keys(depts).sort((a, b) => depts[b] - depts[a]).map((d) => stat("dept", d, d.split(" : ").pop(), depts[d])).join("")) +
+      (filter ? '<a href="#" class="dottedlink nsh-home-all">Show all</a>' : "");
+  }
+
+  // View (Normal / Large rows / Tiles) for the portlet, remembered apart from the Pending
+  // Orders page's (the portlet is narrower). Looks like the portlet's own page dropdown
+  // (a copy with its ids and handlers removed). Only with Helper view on.
+  const HOME_LAYOUT_KEY = "nshHomeLayout";
+  function homeLayout() {
+    let v = "normal";
+    try {
+      v = localStorage.getItem(HOME_LAYOUT_KEY) || "normal";
+    } catch (e) {}
+    return LAYOUTS.some((l) => l[0] === v) ? v : "normal";
+  }
+  function applyHomeLayout(table) {
+    const v = homeLayout();
+    LAYOUTS.forEach((l) => table.classList.toggle("nsh-view-" + l[0], l[0] === v && v !== "normal"));
+  }
+  function addHomeViewField(wrap, table) {
+    const right = wrap.querySelector(".nsh-home-right");
+    if (!right) return;
+    let field = right.querySelector(".nsh-home-view");
+    const name = () => (LAYOUTS.find((l) => l[0] === homeLayout()) || LAYOUTS[0])[1];
+    if (!field) {
+      field = document.createElement("span");
+      field.className = "nsh-home-view";
+      const look = wrap.querySelector(".portletFilterBar .uir-pagination-select");
+      let box;
+      if (look) {
+        box = look.cloneNode(true);
+        [box, ...box.querySelectorAll("*")].forEach((e) =>
+          [...e.attributes].forEach((a) => {
+            if (/^(id|name|for|title|aria-\w+|data-[\w-]+)$|^on/.test(a.name)) e.removeAttribute(a.name);
+          })
+        );
+      } else {
+        box = document.createElement("span");
+        box.className = "uir-pagination-select";
+        box.innerHTML = '<span class="uir-pagination-label"></span>';
+      }
+      box.classList.add("nsh-home-view-box");
+      // NetSuite draws the box and its arrow from where the original sits, so copy the
+      // look from the real one (computed styles, theme included).
+      if (look) {
+        const cs = getComputedStyle(look);
+        ["border", "padding", "backgroundColor", "display"].forEach((k) => (box.style[k] = cs[k]));
+        const realLabel = look.querySelector(".uir-pagination-label");
+        const myLabel = box.querySelector(".uir-pagination-label");
+        if (realLabel && myLabel) {
+          const ls = getComputedStyle(realLabel);
+          ["padding", "font", "color", "display"].forEach((k) => (myLabel.style[k] = ls[k]));
+          myLabel.style.position = "relative";
+          const a = getComputedStyle(realLabel, "::after");
+          if (a.content !== "none" && !document.getElementById("nsh-home-caret")) {
+            const st = document.createElement("style");
+            st.id = "nsh-home-caret";
+            st.textContent =
+              ".nsh-home-view-box .uir-pagination-label::after{content:'';position:absolute;right:" + a.right + ";top:" + a.top + ";width:" + a.width + ";height:" + a.height +
+              ";background-image:" + a.backgroundImage + ";background-position:" + a.backgroundPosition + ";background-size:" + a.backgroundSize + ";background-repeat:no-repeat}";
+            document.head.appendChild(st);
+          }
+        }
+        box.querySelectorAll("ul").forEach((u) => u.remove()); // NetSuite's own option list
+      }
+      box.setAttribute("role", "button");
+      box.tabIndex = 0;
+      field.innerHTML = '<span class="nsh-home-switch-label">View</span>';
+      field.appendChild(box);
+      right.insertBefore(field, right.firstChild);
+      const open = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropMenu(box, LAYOUTS, (v) => {
+          try {
+            localStorage.setItem(HOME_LAYOUT_KEY, v);
+          } catch (err) {}
+          const label = box.querySelector(".uir-pagination-label") || box;
+          label.textContent = name();
+          const t = [...wrap.querySelectorAll("table")].find((x) => x.querySelector("tr.nsh-group-row"));
+          if (t) applyHomeLayout(t);
+        });
+      };
+      box.addEventListener("click", open);
+      box.addEventListener("mousedown", (e) => e.stopPropagation());
+      box.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && open(e));
+    }
+    const label = field.querySelector(".uir-pagination-label") || field.querySelector(".nsh-home-view-box");
+    label.textContent = name();
+  }
+
+  async function dressPortlet(wrap) {
+    addHomeSwitch(wrap);
+    if (!homeOn()) return;
+    const table = [...wrap.querySelectorAll("table")].find((t) => t.querySelector(":scope > thead > tr.uir-list-headerrow, :scope > tbody > tr.uir-list-headerrow, :scope > tr.uir-list-headerrow"));
+    if (!table || table.querySelector("tr.nsh-group-row") || table.dataset.nshBusy) return;
+    table.dataset.nshBusy = "1";
+    try {
+      ROOT = table;
+      filter = null; // a fresh page starts unfiltered
+      const rows = readRows();
+      if (!rows || !rows.length) return;
+      drawStock(rows, null);
+      groupRows(rows, today());
+      labelCells(rows);
+      applyFilter(rows, null, today());
+      ROOT = null;
+      drawHomeSummary(wrap, table, rows, null);
+      addHomeViewField(wrap, table);
+      applyHomeLayout(table);
+      await sleep(50);
+      let stock = {};
+      try {
+        stock = stockFor(rows);
+      } catch (err) {
+        console.warn("[NetSuite Helper] stock check", err);
+      }
+      ROOT = table;
+      drawStock(rows, stock);
+      applyFilter(rows, stock, today()); // section counts ("4 orders") and even stripes
+      ROOT = null;
+      drawHomeSummary(wrap, table, rows, stock);
+    } finally {
+      ROOT = null;
+      delete table.dataset.nshBusy;
+    }
+  }
+  function startHome() {
+    hookStockDetails();
+    const run = () => homePortlets().forEach((w) => dressPortlet(w));
+    let tries = 0;
+    const first = setInterval(() => {
+      run();
+      if (homePortlets().length || ++tries > 20) clearInterval(first);
+    }, 500);
+    // The portlet redraws its list when it's refreshed, filtered or paged: dress it again.
+    let timer = null;
+    new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(run, 400);
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
   async function start() {
     addViewSwitch();
     if (!helperOn()) return;
@@ -970,5 +1214,6 @@
     Object.assign(window.__nshStatsTest, { dayOf, bucket, isSamples });
     return;
   }
-  start();
+  if (onHome) startHome();
+  else start();
 })();

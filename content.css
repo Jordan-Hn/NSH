@@ -320,37 +320,37 @@ tr.nsh-group-row .nsh-group-count { font-weight: 400; color: #666; margin-left: 
 #nsh-view-field .uir-field { cursor: pointer; }
 
 /* Large rows: text wraps, nothing cut off, the whole stock list shows. */
-#div__body.nsh-view-large tr.uir-list-row-tr > td { white-space: normal !important; vertical-align: top !important; padding-top: 7px !important; padding-bottom: 7px !important; font-size: 13px !important; line-height: 1.4 !important; }
-#div__body.nsh-view-large .nsh-stock-brief { display: none; }
-#div__body.nsh-view-large .nsh-stock-all { display: block; color: #303030; font-weight: 400; font-size: 12px; margin-top: 2px; }
+table.nsh-view-large tr.uir-list-row-tr > td { white-space: normal !important; vertical-align: top !important; padding-top: 7px !important; padding-bottom: 7px !important; font-size: 13px !important; line-height: 1.4 !important; }
+table.nsh-view-large .nsh-stock-brief { display: none; }
+table.nsh-view-large .nsh-stock-all { display: block; color: #303030; font-weight: 400; font-size: 12px; margin-top: 2px; }
 
 /* Tiles: one card per order, values under their column names. */
-#div__body.nsh-view-tiles, #div__body.nsh-view-tiles > tbody { display: block !important; width: 100% !important; }
-#div__body.nsh-view-tiles > tbody { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; padding: 8px 0 12px; }
-#div__body.nsh-view-tiles tr.uir-list-headerrow { display: none !important; }
-#div__body.nsh-view-tiles tr.nsh-group-row { display: block; grid-column: 1 / -1; margin-top: 4px; }
-#div__body.nsh-view-tiles tr.nsh-group-row > td { display: block; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr {
+table.nsh-view-tiles, table.nsh-view-tiles > tbody { display: block !important; width: 100% !important; }
+table.nsh-view-tiles > tbody { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; padding: 8px 0 12px; }
+table.nsh-view-tiles tr.uir-list-headerrow { display: none !important; }
+table.nsh-view-tiles tr.nsh-group-row { display: block; grid-column: 1 / -1; margin-top: 4px; }
+table.nsh-view-tiles tr.nsh-group-row > td { display: block; }
+table.nsh-view-tiles tr.uir-list-row-tr {
   display: grid; grid-template-columns: 1fr 1fr auto; align-content: start;
   grid-template-areas: "doc date edit" "name name name" "status dept amount" "memo memo memo" "stock stock stock";
   border: 1px solid #dfe4eb; border-radius: 4px; overflow: hidden; background: var(--nsh-tile-bg, #fff);
 }
-#div__body.nsh-view-tiles tr.uir-list-row-tr:hover { border-color: #b5bfcc; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td { display: block; width: auto !important; height: auto !important; padding: 5px 12px !important; white-space: normal !important; text-align: left !important; font-size: 13px !important; line-height: 1.35 !important; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-blank] { display: none; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area=""], #div__body.nsh-view-tiles tr.uir-list-row-tr > td:not([data-area]) { grid-column: 1 / -1; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-label]:not([data-label=""])::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 400; color: #6f6f6f; text-transform: uppercase; margin-bottom: 1px; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="doc"] { grid-area: doc; font-weight: 600 !important; font-size: 14px !important; padding-top: 9px !important; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="date"] { grid-area: date; padding-top: 9px !important; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="edit"] { grid-area: edit; padding-top: 9px !important; text-align: right !important; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="name"] { grid-area: name; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="status"] { grid-area: status; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="dept"] { grid-area: dept; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="amount"] { grid-area: amount; text-align: right !important; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="memo"] { grid-area: memo; }
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td[data-area="stock"] { grid-area: stock; padding-bottom: 9px !important; }
-#div__body.nsh-view-tiles .nsh-stock-brief { display: none; }
-#div__body.nsh-view-tiles .nsh-stock-all { display: block; color: #303030; font-weight: 400; font-size: 12px; margin-top: 2px; }
+table.nsh-view-tiles tr.uir-list-row-tr:hover { border-color: #b5bfcc; }
+table.nsh-view-tiles tr.uir-list-row-tr > td { display: block; width: auto !important; height: auto !important; padding: 5px 12px !important; white-space: normal !important; text-align: left !important; font-size: 13px !important; line-height: 1.35 !important; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-blank] { display: none; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area=""], table.nsh-view-tiles tr.uir-list-row-tr > td:not([data-area]) { grid-column: 1 / -1; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-label]:not([data-label=""])::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 400; color: #6f6f6f; text-transform: uppercase; margin-bottom: 1px; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="doc"] { grid-area: doc; font-weight: 600 !important; font-size: 14px !important; padding-top: 9px !important; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="date"] { grid-area: date; padding-top: 9px !important; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="edit"] { grid-area: edit; padding-top: 9px !important; text-align: right !important; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="name"] { grid-area: name; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="status"] { grid-area: status; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="dept"] { grid-area: dept; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="amount"] { grid-area: amount; text-align: right !important; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="memo"] { grid-area: memo; }
+table.nsh-view-tiles tr.uir-list-row-tr > td[data-area="stock"] { grid-area: stock; padding-bottom: 9px !important; }
+table.nsh-view-tiles .nsh-stock-brief { display: none; }
+table.nsh-view-tiles .nsh-stock-all { display: block; color: #303030; font-weight: 400; font-size: 12px; margin-top: 2px; }
 /* Stock details box (v0.19.3): hover shows it, click keeps it open. */
 .nsh-stock-check { cursor: pointer; }
 td.nsh-stock-pop-cell { position: relative; overflow: visible !important; }
@@ -366,4 +366,32 @@ td.nsh-stock-pop-cell { position: relative; overflow: visible !important; }
 .nsh-stats-table a.nsh-stat.nsh-stat-on { background: #1f4a85; color: #fff !important; }
 .nsh-stats-table a.nsh-stat.nsh-stat-bad.nsh-stat-on { background: #9b111e; color: #fff !important; }
 /* Tiles: no stripes, plain white cards (overdue light red), v0.19.14 */
-#div__body.nsh-view-tiles tr.uir-list-row-tr > td { --nsh-cell-bg: var(--nsh-tile-bg, #fff); border-color: transparent !important; }
+table.nsh-view-tiles tr.uir-list-row-tr > td { --nsh-cell-bg: var(--nsh-tile-bg, #fff); border-color: transparent !important; }
+
+/* Home portlet "Helper view" switch (v0.22.4): NetSuite-style on/off pill in the portlet's title bar. */
+.nsh-home-switch { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; cursor: pointer; vertical-align: middle; user-select: none; }
+.nsh-home-switch-label { font: 400 11px "Open Sans", Helvetica, sans-serif; text-transform: uppercase; color: #6f6f6f; }
+.nsh-home-switch-pill { position: relative; width: 34px; height: 18px; border-radius: 9px; background: #c9c9c9; transition: background .15s; }
+.nsh-home-switch-pill::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+.nsh-home-switch.nsh-on .nsh-home-switch-pill { background: #3fae29; }
+.nsh-home-switch.nsh-on .nsh-home-switch-pill::after { left: 18px; }
+.nsh-home-switch:focus-visible { outline: 2px solid #607799; outline-offset: 2px; border-radius: 3px; }
+.portletFilterBar > .nsh-home-right { float: right; display: inline-flex; align-items: center; gap: 16px; margin: 7px 10px 0 0; position: relative; z-index: 1; }
+.nsh-home-right .nsh-home-switch { margin-right: 0; }
+.nsh-home-view { display: inline-flex; align-items: center; gap: 6px; }
+.nsh-home-view-box { cursor: pointer; }
+
+/* Home portlet Summary in the filter row (v0.22.7): same pills as the Pending Orders page. */
+td.nsh-home-summary { padding: 0 0 0 22px !important; vertical-align: middle; white-space: normal; }
+.nsh-home-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-right: 18px; padding-right: 18px; border-right: 1px solid #dfe4eb; vertical-align: middle; }
+.nsh-home-group:last-of-type { border-right: 0; }
+.nsh-home-stat { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.nsh-home-stat-label { font: 400 11px "Open Sans", Helvetica, sans-serif; text-transform: uppercase; color: #6f6f6f; }
+.nsh-home-summary a.nsh-stat { display: inline-block; min-width: 20px; padding: 0 8px; border-radius: 10px; background: #e3ebf6; color: #1f4a85 !important; font: 600 12px/18px "Open Sans", Helvetica, sans-serif; text-align: center; text-decoration: none !important; cursor: pointer; }
+.nsh-home-summary a.nsh-stat:hover { background: #cddbef; }
+.nsh-home-summary a.nsh-stat.nsh-stat-bad { background: #fbe3e3; color: #9b111e !important; }
+.nsh-home-summary a.nsh-stat.nsh-stat-bad:hover { background: #f6cdcd; }
+.nsh-home-summary a.nsh-stat.nsh-stat-on { background: #1f4a85; color: #fff !important; }
+.nsh-home-summary a.nsh-stat.nsh-stat-bad.nsh-stat-on { background: #9b111e; color: #fff !important; }
+.nsh-home-summary .nsh-stat-zero { color: #999; font-size: 12px; }
+.nsh-home-summary a.nsh-home-all { font-size: 12px; white-space: nowrap; }
