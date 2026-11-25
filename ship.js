@@ -1053,6 +1053,10 @@
       const m = String(bill.getAttribute("onclick") || "").match(/'(\/app\/accounting\/transactions\/custinvc\.nl[^']*)'/);
       const billUrl = m ? m[1] : "/app/accounting/transactions/custinvc.nl?id=" + encodeURIComponent(p.rec.id) + "&memdoc=0&transform=salesord&e=T&itemship=" + encodeURIComponent(ifId) + "&whence=";
       getFrame(slot).src = "about:blank";
+      // A background tab first (25/11/2026): it saves itself and closes. If the extension
+      // can't open one, the pop-up below as before.
+      inv = await billInBackgroundTab(billUrl, notBilled, findInvoice, say);
+      if (!inv) {
       const pop = window.open(billUrl, "nshBillWindow" + (slot || 0), "width=1000,height=760,left=" + (80 + 40 * (slot || 0)) + ",top=" + (60 + 40 * (slot || 0)));
       if (!pop) throw step(notBilled, "the browser blocked the billing pop-up. Allow pop-ups for NetSuite, then Retry");
       let said = [];
@@ -1093,6 +1097,7 @@
           leavePage(pop);
           pop.close();
         } catch (e) {}
+      }
       }
     }
     p.invoice = { id: inv.getId(), tranid: inv.getValue("tranid") };
@@ -1204,6 +1209,43 @@
     d.shipped = d.labels = d.paper = true;
     getFrame(slot).src = "about:blank";
     return "done";
+  }
+
+  // Bills in a background tab next to this one (autobill.js saves it there, once). Returns
+  // the invoice, null if the tab couldn't be opened (use the pop-up), or throws.
+  async function billInBackgroundTab(billUrl, notBilled, findInvoice, say) {
+    const billKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const key = "nshBill:" + billKey;
+    const open = await toExtension("nsh-tab-open", { url: billUrl + "#nshbill=" + billKey }, 15000);
+    if (!open || !open.ok || !open.tabId) return null;
+    const state = () => {
+      try {
+        return JSON.parse(localStorage.getItem(key) || "null");
+      } catch (e) {
+        return null;
+      }
+    };
+    let inv = null;
+    try {
+      say("Billing: invoice opening in a background tab...");
+      const started = Date.now();
+      for (;;) {
+        await sleep(1500);
+        if ((inv = findInvoice())) break;
+        const st = state();
+        if (st && st.state === "error") throw step(notBilled, reason((st.msgs || []).join(" ")) || "the invoice didn't save. Check the sales order for an invoice before Retry");
+        if (st && st.state === "saving") say("Billing: saving the invoice...");
+        if (Date.now() - started > (st && st.state === "saving" ? 120000 : 90000)) {
+          throw step(notBilled, st && st.state === "saving" ? "the invoice didn't save in time. Check the sales order for an invoice before Retry" : "the invoice page didn't finish loading. Nothing was billed, so Retry is safe");
+        }
+      }
+    } finally {
+      toExtension("nsh-tab-close", { tabId: open.tabId }, 5000);
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    }
+    return inv;
   }
 
   function w2f(v) {
@@ -1564,7 +1606,7 @@
   function drawJob(work, title) {
     fill(
       title,
-      '<table class="nsh-wave-table"><tr><th>Ship</th><th>Order</th><th>Customer</th><th>Sleeve</th><th>Connote</th><th>Invoice</th><th></th></tr>' +
+      '<table class="nsh-wave-table"><tr><th>Order</th><th>Customer</th><th>Sleeve</th><th>Connote</th><th>Invoice</th><th></th></tr>' +
         work
           .map((p) => {
             const cls = p.result === "failed" ? "nsh-wave-bad" : p.result ? "" : "nsh-wave-wait";

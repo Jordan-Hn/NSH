@@ -445,3 +445,46 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     });
   return true; // reply comes later
 });
+
+// ---------- Ship Orders billing in a background tab (25/11/2026) ----------
+// The invoice page can't run in a hidden frame (NetSuite's set-up crashes there), and a
+// page can only open pop-ups in front. So Ship Orders asks for a background tab: opened
+// next to its own tab, not switched to. autobill.js in that tab saves the invoice once;
+// Ship Orders closes the tab when NetSuite shows the invoice. Only invoice pages.
+const isInvoicePage = (url) => {
+  try {
+    const u = new URL(url);
+    return u.hostname.endsWith(".netsuite.com") && /\/app\/accounting\/transactions\/custinvc\.nl$/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+};
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || (msg.type !== "nsh-tab-open" && msg.type !== "nsh-tab-close")) return;
+  const from = sender.tab && sender.tab.url;
+  if (!from || !isAllowedSite(from)) {
+    reply({ ok: false, error: "Not a NetSuite page." });
+    return;
+  }
+  if (msg.type === "nsh-tab-open") {
+    let url = "";
+    try {
+      url = new URL(msg.url, from).href;
+    } catch {}
+    if (!isInvoicePage(url)) {
+      reply({ ok: false, error: "Only invoice pages open this way." });
+      return;
+    }
+    chrome.tabs
+      .create({ url, active: false, index: sender.tab.index + 1, openerTabId: sender.tab.id, windowId: sender.tab.windowId })
+      .then((t) => reply({ ok: true, tabId: t.id }), (e) => reply({ ok: false, error: String((e && e.message) || e) }));
+    return true;
+  }
+  // Close: only a tab that is still (or was) a NetSuite invoice page.
+  chrome.tabs
+    .get(msg.tabId)
+    .then((t) => (t && (isInvoicePage(t.url) || isInvoicePage(t.pendingUrl || "")) ? chrome.tabs.remove(t.id) : null))
+    .catch(() => {})
+    .finally(() => reply({ ok: true }));
+  return true;
+});

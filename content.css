@@ -403,3 +403,10 @@ tr.nsh-ship-left-out > td a { color: #9a9a9a !important; }
 /* Ship Orders Method dropdown (v0.23.8) */
 select.nsh-ship-method { max-width: 230px; font: 400 12px "Open Sans", Helvetica, sans-serif; color: #262626; border: 1px solid #ccc; border-radius: 3px; padding: 2px 4px; background: #fff; }
 select.nsh-ship-method:focus { outline: 2px solid #607799; outline-offset: 1px; }
+
+/* Wider paste boxes for tracker rows (v0.24.4): each pasted row on its own line (no wrapping;
+   a very long row scrolls sideways instead), and room for more rows. */
+.nsh-wave-panel textarea#nsh-ship-input,
+.nsh-wave-panel textarea#nsh-print-input,
+.nsh-wave-panel textarea#nsh-wave-input { width: 760px; max-width: calc(100% - 8px); min-height: 150px; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+.nsh-wave-panel textarea#nsh-open-input { width: 420px; max-width: calc(100% - 8px); }

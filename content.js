@@ -306,12 +306,13 @@
     if (e.source !== window || e.origin !== location.origin) return;
     const d = e.data;
     // nsh-autoprint (PDF bytes), nsh-autoprint-url (a label link), nsh-autoprint-state (is the helper running?)
-    const m = d && typeof d.type === "string" && d.type.match(/^(nsh-autoprint(?:-url|-state)?)-send$/);
+    // nsh-tab-open / nsh-tab-close: Ship Orders' billing tab, opened in the background (25/11/2026).
+    const m = d && typeof d.type === "string" && d.type.match(/^(nsh-autoprint(?:-url|-state)?|nsh-tab-open|nsh-tab-close)-send$/);
     if (!m) return;
     const base = m[1];
     const answer = (res) => window.postMessage(Object.assign({ type: base + "-result", id: d.id }, res), location.origin);
     try {
-      chrome.runtime.sendMessage({ type: base, name: d.name, dataUrl: d.dataUrl, url: d.url }, (res) => {
+      chrome.runtime.sendMessage({ type: base, name: d.name, dataUrl: d.dataUrl, url: d.url, tabId: d.tabId }, (res) => {
         if (chrome.runtime.lastError) answer({ ok: false, error: chrome.runtime.lastError.message });
         else answer(res || { ok: false, error: "No answer from the extension." });
       });
