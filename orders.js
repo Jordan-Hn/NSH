@@ -24,7 +24,10 @@
   "use strict";
 
   // Loads on the Pending Orders page and only lends window.__nshOrderExport (no panel).
-  if (!/[?&]searchid=146970(&|$)/.test(location.search) && !window.__nshOrdersTest) return;
+  // Also on a sales order / transfer order page (view, not edit): a "Copy Tracker Row" button
+  // (26/11/2026).
+  const ON_RECORD = /\/app\/accounting\/transactions\/(salesord|trnfrord)\.nl$/i.test(location.pathname) && !/[?&]e=T/.test(location.search);
+  if (!/[?&]searchid=146970(&|$)/.test(location.search) && !ON_RECORD && !window.__nshOrdersTest) return;
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const col = (n, j) => new window.nlobjSearchColumn(n, j || null);
@@ -433,9 +436,10 @@
       ta.remove();
     }
     if (btn) {
-      const old = btn.textContent;
-      btn.textContent = "Copied";
-      setTimeout(() => (btn.textContent = old), 1200);
+      const prop = btn.tagName === "INPUT" ? "value" : "textContent";
+      const old = btn[prop];
+      btn[prop] = "Copied";
+      setTimeout(() => (btn[prop] = old), 1200);
     }
   }
 
@@ -569,10 +573,16 @@
 
   // Export for other pages (Pending Orders): the listed orders -> tracker rows / Excel.
   // The export lives on the list page, not a separate paste-in box (24/11/2026).
-  function trackerExport(orders) {
+  function trackerExport(orders, opts) {
     const info = details(orders);
-    const cws = cwsRows(orders, info);
-    const retail = retailRows(orders, info);
+    // fromOrder: rows start at the order number (Copy Tracker Row on an order's page, 26/11/2026):
+    // CWS from the SO column (no picking date), Retail from the TO column (no DATE or PO).
+    // courier: a guess for orders not shipped yet (COURIER is the 5th CWS column).
+    let cwsAll = cwsRows(orders, info);
+    if (opts && opts.courier) cwsAll = cwsAll.map((r) => (r[4] ? r : r.slice(0, 4).concat(opts.courier, r.slice(5))));
+    // From an order's page, PICK QTY is left empty too (not needed; the cell stays so WAVE lines up).
+    const cws = opts && opts.fromOrder ? cwsAll.map((r) => r.slice(1).map((v, i) => (i === 8 ? "" : v))) : cwsAll;
+    const retail = opts && opts.fromOrder ? retailRows(orders, info).map((r) => r.slice(2)) : retailRows(orders, info);
     const tabbed = (rows) => rows.map((r) => r.join("\t")).join("\n");
     const csvCell = (v) => {
       const s = String(v == null ? "" : v);
@@ -580,7 +590,8 @@
     };
     const csvRows = (header, rows) => [header.map((h) => h.trim())].concat(rows).map((r) => r.map(csvCell).join(",")).join("\r\n");
     return {
-      count: cws.length + retail.filter((r) => r[2]).length,
+      rows: cws.concat(retail),
+      count: cws.length + retail.filter((r) => r[opts && opts.fromOrder ? 0 : 2]).length,
       missing: orders.filter((o) => !info[o]),
       // Tracker layout as CSV: the CWS rows, then (if any) the Retail rows after a blank line.
       csv: () => [cws.length ? csvRows(CWS_COLS, cws) : "", retail.length ? csvRows(RETAIL_COLS, retail) : ""].filter(Boolean).join("\r\n\r\n"),
@@ -602,6 +613,111 @@
     };
   }
   window.__nshOrderExport = { trackerExport, pageWorkbook };
+
+  // "Copy Tracker Row" on the order's own page, next to Send Email: the order as one tracker
+  // row (CWS columns for an SO, Retail columns for a TO), starting at the order number, whatever
+  // NetSuite has so far. The button is a copy of NetSuite's own (ids and its click removed).
+  // The courier a customer usually gets (26/11/2026): the most common courier on their shipped
+  // fulfilments in the last year ("Custom" once shipped = a pickup). "" if none.
+  function usualCourier(customerId) {
+    if (!customerId) return "";
+    const counts = {};
+    (window.nlapiSearchRecord(
+      "itemfulfillment",
+      null,
+      [["entity", "anyof", customerId], "AND", ["mainline", "is", "T"], "AND", ["status", "anyof", "ItemShip:C"], "AND", ["trandate", "onorafter", "daysago365"]],
+      [new window.nlobjSearchColumn("shipmethod")]
+    ) || []).forEach((r) => {
+      const name = r.getText("shipmethod");
+      if (!name || /^\$/.test(name.trim())) return; // "$22 Freight (incl. GST)" is a price, not a courier
+      const c = /^custom$/i.test(name) ? "PICKUP" : courierOf(name);
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || "";
+  }
+
+  function addCopyRowButton() {
+    if (document.getElementById("nsh-copy-row")) return;
+    // View mode doesn't give the number through nlapiGetFieldValue: read the record number at
+    // the top of the page, else look it up from the id in the address.
+    let tranid = String((window.nlapiGetFieldValue && window.nlapiGetFieldValue("tranid")) || "").toUpperCase();
+    if (!tranid) tranid = ((document.querySelector(".uir-record-id") || {}).textContent || "").trim().toUpperCase();
+    if (!/^(SO|TO)\d+$/.test(tranid)) {
+      try {
+        const id = new URLSearchParams(location.search).get("id");
+        const type = /trnfrord/i.test(location.pathname) ? "transferorder" : "salesorder";
+        tranid = String(window.nlapiLookupField(type, id, "tranid") || "").toUpperCase();
+      } catch (e) {}
+    }
+    if (!/^(SO|TO)\d+$/.test(tranid)) return;
+    const tables = [...document.querySelectorAll("table.uir-button")];
+    const anchor = tables.find((t) => /send email/i.test(t.textContent) || /sendemail/i.test(t.id)) || tables.find((t) => !/primary/i.test(t.className + (t.querySelector("input") || {}).className));
+    const cell = anchor && anchor.parentElement;
+    if (!cell || cell.tagName !== "TD") return;
+    const mine = cell.cloneNode(true);
+    [mine, ...mine.querySelectorAll("*")].forEach((e) => {
+      e.removeAttribute("id");
+      [...e.attributes].forEach((a) => /^on/.test(a.name) && e.removeAttribute(a.name));
+    });
+    const input = mine.querySelector("input[type=button]");
+    if (!input) return;
+    input.id = "nsh-copy-row";
+    input.value = "Copy Tracker Row";
+    // Clicked straight after the page opens, NetSuite's search tools may not be ready, which
+    // gave a row with just the order number (26/11/2026). So wait for them, and try again
+    // (up to ~10 s) until the row has its customer / store.
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let busy = false;
+    let ready = null; // a row that took too long to fetch: copied on the next click
+    input.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (busy) return;
+      if (ready) {
+        const r = ready;
+        ready = null;
+        input.value = "Copy Tracker Row";
+        return r.copy(input);
+      }
+      busy = true;
+      input.value = "Copying...";
+      const started = Date.now();
+      try {
+        let ex = null;
+        for (let i = 0; i < 20; i++) {
+          if (typeof window.nlapiSearchRecord === "function" && typeof window.nlapiLookupField === "function" && document.readyState === "complete") {
+            try {
+              // Not shipped yet: fill COURIER with the customer's usual one (SOs; stores have no courier column).
+              let courier = "";
+              if (/^SO/.test(tranid)) {
+                try {
+                  const id = new URLSearchParams(location.search).get("id");
+                  courier = usualCourier(window.nlapiLookupField("salesorder", id, "entity"));
+                } catch (err) {}
+              }
+              ex = trackerExport([tranid], { fromOrder: true, courier });
+              const row = ex.rows[0] || [];
+              if (ex.count && row.slice(1).some((v) => String(v || "").trim())) break; // has more than the number
+            } catch (err) {}
+          }
+          ex = null;
+          await sleep(500);
+        }
+        input.value = "Copy Tracker Row";
+        if (!ex) return alert("Copy tracker row: NetSuite hasn't finished loading " + tranid + ". Try again in a moment.");
+        // Browsers only allow copying shortly after a click: after a long wait, ask for one more click.
+        if (Date.now() - started > 4000) {
+          ready = ex;
+          input.value = "Click again to copy";
+          return;
+        }
+        await ex.copy(input);
+      } finally {
+        busy = false;
+      }
+    });    cell.after(mine);
+  }
+  if (ON_RECORD && !window.__nshOrdersTest) setTimeout(addCopyRowButton, 600);
   if (window.__nshOrdersTest) {
     Object.assign(window.__nshOrdersTest, { parseOrders, courierOf, pltCtn, cwsRows, retailRows, excelDate, stateCode, colName, sheetXml, crc32, excel, CWS_COLS, CWS_WIDTHS, RETAIL_COLS, RETAIL_WIDTHS, pageWorkbook });
   }

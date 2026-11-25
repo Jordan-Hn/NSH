@@ -660,10 +660,15 @@
     pageCss.id = "nsh-print-page";
     pageCss.textContent = "@page { size: A4 landscape; margin: 0 !important; } @media print { html, body.nsh-printing { margin: 0 !important; padding: 0 !important; } body.nsh-printing #nsh-print-sheet { padding: 12mm !important; -webkit-box-decoration-break: clone; box-decoration-break: clone; } }";
     document.head.appendChild(pageCss);
+    // The PDF's file name comes from the page title while printing: Sales-Order-Status-26-11-2026
+    // (26/11/2026). Put back after.
+    const oldTitle = document.title;
+    document.title = "Sales-Order-Status-" + todayText().replace(/\//g, "-");
     const done = () => {
       document.body.classList.remove("nsh-printing");
       pageCss.remove();
       sheet.remove();
+      document.title = oldTitle;
       window.removeEventListener("afterprint", done);
     };
     window.addEventListener("afterprint", done);

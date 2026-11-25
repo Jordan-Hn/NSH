@@ -216,10 +216,74 @@
 
   // ---------- NetSuite lookups ----------
 
-  const col = (n, join) => new window.nlobjSearchColumn(n, join || null);
-  function search(type, filters, cols) {
-    return window.nlapiSearchRecord(type, null, filters, cols) || [];
+  // NetSuite lets each page do only so much lookup work: 1000 units, 10 per search or
+  // lookup, so about 100. Ship Orders used to do all its lookups from this page and ran
+  // out mid-run ("Script Execution Usage Limit Exceeded", 26/11/2026). Lookups now run in
+  // a hidden NetSuite page of their own, which is reloaded for a fresh allowance before it
+  // runs low (the same as refreshing the page). Columns have to be made in the page that
+  // searches, so col() only notes the column and search() makes it.
+  // Two pages take turns, so the one in use is never reloaded under a lookup still going.
+  const lkFrames = [];
+  let lkTurn = 0;
+  let lkWin = null;
+  let lkLoading = null;
+  const unitsLeft = (w) => {
+    try {
+      return w.nlapiGetContext().getRemainingUsage();
+    } catch (e) {
+      return 0;
+    }
+  };
+  function ns() {
+    return lkWin && unitsLeft(lkWin) >= 40 ? lkWin : window;
   }
+  function freshLookups(min) {
+    if (lkWin && unitsLeft(lkWin) >= (min || 300)) return Promise.resolve();
+    if (lkLoading) return lkLoading;
+    lkLoading = (async () => {
+      lkTurn = 1 - lkTurn;
+      let lkFrame = lkFrames[lkTurn];
+      if (!lkFrame || !document.body.contains(lkFrame)) {
+        lkFrame = lkFrames[lkTurn] = document.createElement("iframe");
+        lkFrame.id = "nsh-ship-lookups-" + lkTurn;
+        lkFrame.style.display = "none";
+        document.body.appendChild(lkFrame);
+      }
+      const stamp = "nshlookups=" + Date.now();
+      lkFrame.src = "/app/common/search/search.nl?searchtype=Transaction&" + stamp;
+      for (let i = 0; i < 60; i++) {
+        await sleep(500);
+        try {
+          const w = lkFrame.contentWindow;
+          if (w.location.search.includes(stamp) && w.document.readyState === "complete" && w.nlapiSearchRecord && unitsLeft(w) > 0) {
+            lkWin = w;
+            break;
+          }
+        } catch (e) {}
+      }
+      lkLoading = null;
+    })();
+    return lkLoading;
+  }
+  const col = (n, join) => ({
+    n,
+    join: join || null,
+    sort: false,
+    setSort() {
+      this.sort = true;
+      return this;
+    },
+  });
+  function search(type, filters, cols) {
+    const w = ns();
+    const made = (cols || []).map((c) => {
+      const m = new w.nlobjSearchColumn(c.n, c.join);
+      if (c.sort) m.setSort();
+      return m;
+    });
+    return w.nlapiSearchRecord(type, null, filters, made) || [];
+  }
+  const lookupField = (type, id, fields, text) => ns().nlapiLookupField(type, id, fields, text);
   function anyTranid(list) {
     const any = [];
     list.forEach((o, i) => {
@@ -548,6 +612,7 @@
     (p.prints = p.prints || []).push(job);
   }
   // Send queued paperwork in pasted order: stop at the first order that isn't finished.
+  // Failed orders are skipped (their paperwork waits for Retry Failed).
   // One flush at a time; each call waits for the one before it.
   let printChain = Promise.resolve();
   function flushPrints(work, draw, title, send) {
@@ -555,6 +620,9 @@
     printChain = printChain.then(async () => {
       for (const p of work) {
         if (!p.finished) break;
+        // A failed order's paperwork is held back, so a half-done order never prints out of
+        // step with the rest; it all prints together once Retry Failed finishes it.
+        if (p.result === "failed") continue;
         const jobs = p.prints || [];
         p.printedCount = p.printedCount || 0;
         while (p.printedCount < jobs.length) {
@@ -649,7 +717,7 @@
   const CHILL_TENANCY = "custrecordrsc_freight_sort_chi_tenancy";
   function chillFind(field, value) {
     const f = field === "postcode" ? CHILL_POSTCODE : CHILL_SUBURB;
-    return (window.nlapiSearchRecord(CHILL_TYPE, null, [[f, "is", value]], [col(CHILL_SUBURB), col(CHILL_STATE), col(CHILL_POSTCODE), col(CHILL_ZONE), col(CHILL_TENANCY)]) || []).map((r) => ({
+    return search(CHILL_TYPE, [[f, "is", value]], [col(CHILL_SUBURB), col(CHILL_STATE), col(CHILL_POSTCODE), col(CHILL_ZONE), col(CHILL_TENANCY)]).map((r) => ({
       suburb: r.getValue(CHILL_SUBURB),
       state: r.getValue(CHILL_STATE),
       postcode: r.getValue(CHILL_POSTCODE),
@@ -806,8 +874,8 @@
 
   // Carrier names as text; the connote as its value (a text lookup leaves free-text fields out).
   function carrierOf(ifId) {
-    const c = w2f(window.nlapiLookupField("itemfulfillment", ifId, ["custbodyrsc_freight_carrier", "custbodyrsc_freight_carrier_service"], true));
-    c.custbodyrsc_freight_carrier_consid = window.nlapiLookupField("itemfulfillment", ifId, "custbodyrsc_freight_carrier_consid") || "";
+    const c = w2f(lookupField("itemfulfillment", ifId, ["custbodyrsc_freight_carrier", "custbodyrsc_freight_carrier_service"], true));
+    c.custbodyrsc_freight_carrier_consid = lookupField("itemfulfillment", ifId, "custbodyrsc_freight_carrier_consid") || "";
     return c;
   }
   const isAusPost = (rf) => /AUSTRALIA POST|EXPRESS POST|AUS POST/i.test(rf.custbodyrsc_freight_carrier + " " + rf.custbodyrsc_freight_carrier_service);
@@ -845,7 +913,7 @@
     const fw = getFrame(slot).contentWindow;
     let shipped = false;
     for (let i = 0; i < 5 && !shipped; i++) {
-      shipped = window.nlapiLookupField("itemfulfillment", ifId, "statusref") === "shipped";
+      shipped = lookupField("itemfulfillment", ifId, "statusref") === "shipped";
       if (!shipped) await sleep(1500);
     }
     if (!shipped) {
@@ -883,7 +951,7 @@
 
     // 1. Ship (skipped if NetSuite already shows it shipped).
     let justSaved = false;
-    let f =w2f(window.nlapiLookupField("itemfulfillment", ifId, ["statusref", "custbodyrsc_freight_carrier_consid"]));
+    let f =w2f(lookupField("itemfulfillment", ifId, ["statusref", "custbodyrsc_freight_carrier_consid"]));
     if (f.statusref !== "shipped") {
       say("Opening " + p.iff.tranid + "...");
       let w = await openPage(ifUrl + "&e=T", "the item fulfilment (edit)", slot);
@@ -1002,7 +1070,7 @@
     if (p.row.courier !== "PICKUP") {
       if (!consid) {
         await sleep(4000);
-        consid = window.nlapiLookupField("itemfulfillment", ifId, "custbodyrsc_freight_carrier_consid");
+        consid = lookupField("itemfulfillment", ifId, "custbodyrsc_freight_carrier_consid");
       }
       if (!consid) throw step("Shipped, no consignment, not billed", "no Consignment ID after saving");
       p.connote = consid;
@@ -1200,7 +1268,7 @@
   // Returns "done", or in a dry run what it would do (nothing saved).
   async function shipAsCustom(iff, dry, say, slot) {
     const url = "/app/accounting/transactions/itemship.nl?id=" + iff.id;
-    const f = w2f(window.nlapiLookupField("itemfulfillment", iff.id, ["statusref"]));
+    const f = w2f(lookupField("itemfulfillment", iff.id, ["statusref"]));
     if (f.statusref === "shipped") return dry ? { status: "Already Shipped", method: "nothing to do", carrier: "", packages: "-", weight: "-" } : "done";
     say("Opening " + iff.tranid + "...");
     const w = await openPage(url + "&e=T", "the item fulfilment (edit)", slot);
@@ -1269,10 +1337,14 @@
     let inv = null;
     try {
       say("Billing: invoice opening in a background tab...");
+      // No NetSuite lookups while waiting (26/11/2026): each lookup from this page uses up
+      // its NetSuite allowance, and polling here every 1.5 s ran it out ("Script Execution
+      // Usage Limit Exceeded"). The invoice tab says when it has saved (localStorage, free);
+      // then the invoice is looked up once (a few tries, a few seconds apart).
       const started = Date.now();
+      let savedAt = 0;
       for (;;) {
-        await sleep(1500);
-        if ((inv = findInvoice())) break;
+        await sleep(1000);
         const st = state();
         if (st && st.state === "error") {
           const said = (st.msgs || []).join(" ");
@@ -1281,11 +1353,20 @@
           throw err;
         }
         if (st && st.state === "saving") say("Billing: saving the invoice...");
-        if (Date.now() - started > (st && st.state === "saving" ? 120000 : 90000)) {
+        if (st && st.state === "saved") {
+          if (!savedAt) savedAt = Date.now();
+          if ((inv = findInvoice())) break;
+          await sleep(3000);
+          if (Date.now() - savedAt > 20000) throw step(notBilled, "the invoice tab saved, but NetSuite doesn't show the invoice yet. Check the sales order before Retry");
+          continue;
+        }
+        const limit = st && st.state === "saving" ? 120000 : 90000;
+        if (Date.now() - started > limit) {
+          // Last look before giving up (one lookup), in case the tab couldn't report back.
+          if ((inv = findInvoice())) break;
           throw step(notBilled, st && st.state === "saving" ? "the invoice didn't save in time. Check the sales order for an invoice before Retry" : "the invoice page didn't finish loading. Nothing was billed, so Retry is safe");
         }
-      }
-    } finally {
+      }    } finally {
       toExtension("nsh-tab-close", { tabId: open.tabId }, 5000);
       try {
         localStorage.removeItem(key);
@@ -1461,13 +1542,14 @@
 
   const pkgText = (row) => [row.plt ? row.plt + " PLT" : "", row.ctn ? row.ctn + " CTN" : ""].filter(Boolean).join(" + ");
 
-  function checkList(text) {
+  async function checkList(text) {
     const box = getPanel().querySelector("#nsh-ship-confirm");
     const rows = parseRows(text);
     if (!rows.length) {
       box.innerHTML = '<p class="nsh-wave-warn">No SO or TO numbers found.</p>';
       return;
     }
+    await freshLookups(500);
     let info;
     try {
       info = lookup([...new Set(rows.map((r) => r.so))]);
@@ -1693,11 +1775,15 @@
     let finishedCount = work.length - todo.length;
     const title = () => (dry ? "Dry Run: " : "Shipping: ") + finishedCount + " of " + work.length + " done";
     let nextTodo = 0;
+    // If NetSuite still says its usage limit was hit, no more orders are started: the
+    // rest would only fail too. They're left for Retry Failed.
+    let limitHit = false;
     const worker = async (slot) => {
       await sleep(slot * 1500); // stagger the start so the pages don't all load at once
-      while (nextTodo < todo.length) {
+      while (nextTodo < todo.length && !limitHit) {
         const k = todo[nextTodo++];
         await oneOrder(work[k], slot);
+        if (work[k].result === "failed" && /usage limit|USAGE_LIMIT/i.test(work[k].note || "")) limitHit = true;
         work[k].finished = true;
         finishedCount++;
         draw(title());
@@ -1705,6 +1791,10 @@
       }
     };
     await Promise.all(Array.from({ length: Math.min(WORKERS, todo.length) }, (_, slot) => worker(slot)));
+    if (limitHit)
+      todo.slice(nextTodo).forEach((k) => {
+        Object.assign(work[k], { result: "failed", finished: true, note: "Not started: NetSuite's usage limit was hit. Use Retry Failed." });
+      });
     await flushPrints(work, draw, title);
 
     async function oneOrder(p, slot) {
@@ -1715,6 +1805,7 @@
         draw(title());
       };
       try {
+        await freshLookups(500);
         p.result = await runOrder(p, dry, say, slot);
         p.note = p.result === "dry"
           ? "Dry run OK: " + p.dryResult.status + ", " + p.dryResult.method + (p.dryResult.carrier ? " (" + p.dryResult.carrier + ")" : "") + ", " + p.dryResult.packages + " packages, " + p.dryResult.weight + " kg." + (p.dryOnline ? " Online fulfilment " + p.dryOnline + "." : "") + " Not saved."
@@ -1790,6 +1881,7 @@
         let fresh;
         try {
           const rows = parseRows(text);
+          await freshLookups(500);
           fresh = plan(rows, lookup([...new Set(rows.map((r) => r.so))]));
           // Orders unticked before the dry run stay left out.
           const leftOut = new Set(plans.filter((x) => x.why === "Left out of this run").map((x) => x.row.so));
