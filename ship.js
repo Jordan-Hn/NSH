@@ -314,19 +314,32 @@
       if (/^MYER/i.test(rec.customer) && (row.courier !== "CHILL" || !row.plt)) return out("flag", "Myer should be Chill and pallets");
       const fam = row.isTO ? "" : family(rec.shipVia);
       if (fam && fam !== courierFamily(row.courier)) return out("flag", "Order's Ship Via is " + rec.shipVia + ", tracker says " + row.courier);
-      const open = rec.ifs.filter((f) => f.statusRef !== "shipped");
-      if (rec.ifs.length > 1) return out("flag", "Two item fulfilments, do it by hand");
+      // Two fulfilments, one from Warehouses : Online and one from a warehouse (25/11/2026):
+      // the Online one is just marked Shipped (Custom, no packages); the warehouse one gets
+      // the courier, the packages, the labels and the invoice (its Bill button, as usual).
+      let ifs = rec.ifs;
+      if (ifs.length === 2 && !row.isTO) {
+        const online = ifs.filter((f) => /online/i.test(f.location || ""));
+        const house = ifs.filter((f) => !/online/i.test(f.location || ""));
+        if (online.length === 1 && house.length === 1) {
+          ifs = house;
+          if (online[0].statusRef !== "shipped") p.onlineIf = online[0];
+          p.warn.push("Two fulfilments: " + online[0].tranid + " (Online) " + (p.onlineIf ? "is just marked Shipped (Custom, no packages)" : "is already Shipped") + "; " + house[0].tranid + " gets the courier, packages, labels and the invoice");
+        }
+      }
+      const open = ifs.filter((f) => f.statusRef !== "shipped");
+      if (ifs.length > 1) return out("flag", "Two item fulfilments, do it by hand");
       // Store orders only (retail SOP 3): a wave that isn't Complete, or a wave with no item
       // fulfilment yet, gets its Ready pick tasks marked Done first (25/11/2026). SOs: flagged.
-      if (!rec.ifs.length && rec.wave) {
+      if (!ifs.length && rec.wave) {
         if (!row.isTO) return out("flag", "Wave " + rec.wave + " but no item fulfilment, check it");
         p.finishWave = true;
         p.warn.push("Wave " + rec.wave + " has no item fulfilment yet: its Ready pick tasks get marked Done first");
       }
-      if (!rec.ifs.length && !rec.wave) return out("skip", "No wave or item fulfilment (not picked yet)");
-      if (rec.ifs.length && !open.length) {
+      if (!ifs.length && !rec.wave) return out("skip", "No wave or item fulfilment (not picked yet)");
+      if (ifs.length && !open.length) {
         // Shipped but stuck on Aus Post Express (state problem) and not billed: carry on and fix it.
-        const f = rec.ifs[0];
+        const f = ifs[0];
         if (p.push) {
           return out("skip", "Item fulfilment already Shipped (pushed)");
         } else if (row.isTO && f.consid) {
@@ -349,15 +362,15 @@
       // A wave still Released (never started) next to an item fulfilment: the order was
       // fulfilled outside the wave (e.g. its own Fulfill button), so the wave is a leftover
       // and the fulfilment is what ships (SO424877 / SO427203, 25/11/2026).
-      const leftoverWave = rec.wave && /released/i.test(rec.waveStatus) && rec.ifs.length;
-      if (leftoverWave && !row.isTO) p.warn.push("Wave " + rec.wave + " was never picked (still Released); shipping item fulfilment " + rec.ifs[0].tranid + ", which was made outside the wave");
+      const leftoverWave = rec.wave && /released/i.test(rec.waveStatus) && ifs.length;
+      if (leftoverWave && !row.isTO) p.warn.push("Wave " + rec.wave + " was never picked (still Released); shipping item fulfilment " + ifs[0].tranid + ", which was made outside the wave");
       if (rec.wave && !/complete/i.test(rec.waveStatus) && !(leftoverWave && !row.isTO)) {
         if (!row.isTO) return out("flag", "Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ", not Complete");
         if (!p.finishWave) p.warn.push("Wave " + rec.wave + " is " + (rec.waveStatus || "not complete") + ": its Ready pick tasks get marked Done first");
         p.finishWave = true;
       }
       // Items left off a done wave are ignored (23/11/2026): the pick tasks are Done, so it ships.
-      p.iff = rec.ifs[0];
+      p.iff = ifs[0];
       p.isTO = !!row.isTO;
       p.interflora = /^INTERFLORA/i.test(rec.customer);
       p.listAfter = /^MYER/i.test(rec.customer) ? "Myer ASN" : /^COLES/i.test(rec.customer) ? "Coles portal" : "";
@@ -860,7 +873,13 @@
     }
     const ifId = p.iff.id;
     const ifUrl = "/app/accounting/transactions/itemship.nl?id=" + ifId;
-    if (p.push) return pushOrder(p, dry, say, slot, ifUrl);
+    if (p.push) return pushOrder(p, dry, say, slot);
+    // The Online fulfilment of a two-fulfilment order: just Shipped (Custom) first.
+    if (p.onlineIf && !d.onlineDone) {
+      const r = await shipAsCustom(p.onlineIf, dry, say, slot);
+      if (dry) p.dryOnline = p.onlineIf.tranid + ": " + r.status + ", " + r.method;
+      else d.onlineDone = true;
+    }
 
     // 1. Ship (skipped if NetSuite already shows it shipped).
     let justSaved = false;
@@ -1175,45 +1194,67 @@
     return true;
   }
 
+  // Marks one item fulfilment Shipped with method Custom and saves it: no courier, packages,
+  // labels or connote. Used for store orders with no packages (retail SOP 3, "push") and
+  // for the Online fulfilment of an order that also has a warehouse one (25/11/2026).
+  // Returns "done", or in a dry run what it would do (nothing saved).
+  async function shipAsCustom(iff, dry, say, slot) {
+    const url = "/app/accounting/transactions/itemship.nl?id=" + iff.id;
+    const f = w2f(window.nlapiLookupField("itemfulfillment", iff.id, ["statusref"]));
+    if (f.statusref === "shipped") return dry ? { status: "Already Shipped", method: "nothing to do", carrier: "", packages: "-", weight: "-" } : "done";
+    say("Opening " + iff.tranid + "...");
+    const w = await openPage(url + "&e=T", "the item fulfilment (edit)", slot);
+    if (!w.nlapiSetFieldValue) throw step("Marking shipped", iff.tranid + " didn't open in edit mode");
+    say("Setting " + iff.tranid + " Shipped, Custom...");
+    w.nlapiSetFieldValue("shipstatus", "C");
+    await sleep(1200);
+    if (w.nlapiGetFieldValue("shipmethod") !== METHOD.CUSTOM.id) {
+      w.nlapiSetFieldValue("shipmethod", METHOD.CUSTOM.id);
+      await sleep(2000);
+    }
+    if (w.nlapiGetFieldValue("shipmethod") !== METHOD.CUSTOM.id) throw step("Marking shipped", "couldn't set " + iff.tranid + " to Custom");
+    if (dry) {
+      const info = { status: w.nlapiGetFieldText("shipstatus"), method: w.nlapiGetFieldText("shipmethod") + ", no packages", carrier: "none", packages: countPackages(w), weight: "0" };
+      leavePage(w);
+      getFrame(slot).src = "about:blank";
+      await sleep(300);
+      return info;
+    }
+    say("Saving " + iff.tranid + "...");
+    await saveFulfilment(w, iff.id, "Marking shipped", slot);
+    getFrame(slot).src = "about:blank";
+    return "done";
+  }
+
   // Store order with no packages (retail SOP 3, "push"): Shipped, method Custom, Save.
-  // No courier, packages, labels or connote; nothing prints; never billed.
-  async function pushOrder(p, dry, say, slot, ifUrl) {
+  // Nothing prints; never billed.
+  async function pushOrder(p, dry, say, slot) {
     const d = (p.done = p.done || {});
-    const ifId = p.iff.id;
-    const f = w2f(window.nlapiLookupField("itemfulfillment", ifId, ["statusref"]));
-    if (f.statusref !== "shipped") {
-      say("Opening " + p.iff.tranid + "...");
-      const w = await openPage(ifUrl + "&e=T", "the item fulfilment (edit)", slot);
-      if (!w.nlapiSetFieldValue) throw step("Marking shipped", "the item fulfilment didn't open in edit mode");
-      say("Setting Shipped, Custom...");
-      w.nlapiSetFieldValue("shipstatus", "C");
-      await sleep(1200);
-      if (w.nlapiGetFieldValue("shipmethod") !== METHOD.CUSTOM.id) {
-        w.nlapiSetFieldValue("shipmethod", METHOD.CUSTOM.id);
-        await sleep(2000);
-      }
-      if (w.nlapiGetFieldValue("shipmethod") !== METHOD.CUSTOM.id) throw step("Marking shipped", "couldn't set the shipping method to Custom");
-      if (dry) {
-        p.dryResult = { status: w.nlapiGetFieldText("shipstatus"), method: w.nlapiGetFieldText("shipmethod") + ", no packages", carrier: "none", packages: countPackages(w), weight: "0" };
-        leavePage(w);
-        getFrame(slot).src = "about:blank";
-        await sleep(300);
-        return "dry";
-      }
-      say("Saving...");
-      await saveFulfilment(w, ifId, "Marking shipped", slot);
-    } else if (dry) {
-      p.dryResult = { status: "Already Shipped", method: "nothing to do", carrier: "", packages: "-", weight: "-" };
+    const r = await shipAsCustom(p.iff, dry, say, slot);
+    if (dry) {
+      p.dryResult = r;
       return "dry";
     }
     d.shipped = d.labels = d.paper = true;
-    getFrame(slot).src = "about:blank";
     return "done";
   }
 
   // Bills in a background tab next to this one (autobill.js saves it there, once). Returns
   // the invoice, null if the tab couldn't be opened (use the pop-up), or throws.
+  // NetSuite's invoice scripts sometimes hit their usage limit on a load (25/11/2026: two
+  // orders, both fine when billed by hand straight after). One automatic retry, only after
+  // checking NetSuite has no invoice for it.
   async function billInBackgroundTab(billUrl, notBilled, findInvoice, say) {
+    try {
+      return await billInBackgroundTabOnce(billUrl, notBilled, findInvoice, say);
+    } catch (err) {
+      if (!err.usageLimit || findInvoice()) throw err;
+      say("Billing: NetSuite hit a script limit, trying the invoice once more...");
+      await sleep(3000);
+      return await billInBackgroundTabOnce(billUrl, notBilled, findInvoice, say);
+    }
+  }
+  async function billInBackgroundTabOnce(billUrl, notBilled, findInvoice, say) {
     const billKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const key = "nshBill:" + billKey;
     const open = await toExtension("nsh-tab-open", { url: billUrl + "#nshbill=" + billKey }, 15000);
@@ -1233,7 +1274,12 @@
         await sleep(1500);
         if ((inv = findInvoice())) break;
         const st = state();
-        if (st && st.state === "error") throw step(notBilled, reason((st.msgs || []).join(" ")) || "the invoice didn't save. Check the sales order for an invoice before Retry");
+        if (st && st.state === "error") {
+          const said = (st.msgs || []).join(" ");
+          const err = step(notBilled, reason(said) || "the invoice didn't save. Check the sales order for an invoice before Retry");
+          err.usageLimit = /usage limit|USAGE_LIMIT/i.test(said);
+          throw err;
+        }
         if (st && st.state === "saving") say("Billing: saving the invoice...");
         if (Date.now() - started > (st && st.state === "saving" ? 120000 : 90000)) {
           throw step(notBilled, st && st.state === "saving" ? "the invoice didn't save in time. Check the sales order for an invoice before Retry" : "the invoice page didn't finish loading. Nothing was billed, so Retry is safe");
@@ -1671,7 +1717,7 @@
       try {
         p.result = await runOrder(p, dry, say, slot);
         p.note = p.result === "dry"
-          ? "Dry run OK: " + p.dryResult.status + ", " + p.dryResult.method + (p.dryResult.carrier ? " (" + p.dryResult.carrier + ")" : "") + ", " + p.dryResult.packages + " packages, " + p.dryResult.weight + " kg. Not saved."
+          ? "Dry run OK: " + p.dryResult.status + ", " + p.dryResult.method + (p.dryResult.carrier ? " (" + p.dryResult.carrier + ")" : "") + ", " + p.dryResult.packages + " packages, " + p.dryResult.weight + " kg." + (p.dryOnline ? " Online fulfilment " + p.dryOnline + "." : "") + " Not saved."
           : "Done" + (p.noBill ? ", not billed (no Bill button on the order), packing slip printed" : "") + (p.listAfter ? ", now " + p.listAfter : "");
         if (p.fixedState) p.note += " (address fixed: " + p.fixedState + ")";
       } catch (err) {
