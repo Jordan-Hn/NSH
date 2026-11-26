@@ -283,7 +283,7 @@ tr.nsh-group-row .nsh-group-count { font-weight: 400; color: #666; margin-left: 
 /* Pending Orders "This page as a PDF": only the clean copy prints, landscape, colours kept */
 #nsh-print-sheet { display: none; }
 @media print {
-  @page { size: A4 landscape; margin: 0; }
+  /* Page size is set by the PDF export itself (stats.js printPage), so printing any other NetSuite page is left alone (27/11/2026). */
   body.nsh-printing > *:not(#nsh-print-sheet) { display: none !important; }
   body.nsh-printing { background: #fff !important; }
   body.nsh-printing #nsh-print-sheet { display: block; font: 9pt "Open Sans", Helvetica, Arial, sans-serif; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

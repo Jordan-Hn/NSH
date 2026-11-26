@@ -24,6 +24,54 @@ function flash(tabId, text, color) {
   }, 3000);
 }
 
+// ---------- Off switch (27/11/2026) ----------
+// A remote off switch for every PC, kept on its own branch of the update repo (the
+// release on main is signed and never changes for this). switch.json = {"on": false}
+// turns every tool off: NetSuite pages are left exactly as NetSuite makes them, the Auto
+// Print button does nothing, and nothing is sent to AutoPrint. {"on": true} (or no file)
+// = normal. Checked when the browser starts, every 15 minutes, and when a NetSuite page
+// loads (at most every 5 minutes). If GitHub can't be reached, the last answer stands.
+// Flipped with plugin-switch.ps1 on the release PC.
+const SWITCH_URL = "https://raw.githubusercontent.com/Jordan-Hn/NSH/switch/switch.json";
+let pluginOff = false;
+let switchCheckedAt = 0;
+chrome.storage.local.get("nshOff").then((v) => setOff(!!v.nshOff, false));
+chrome.storage.onChanged.addListener((c, area) => area === "local" && c.nshOff && setOff(!!c.nshOff.newValue, false));
+function setOff(off, save) {
+  pluginOff = off;
+  if (save) chrome.storage.local.set({ nshOff: off });
+  if (off) {
+    chrome.action.setBadgeBackgroundColor({ color: "#777777" });
+    chrome.action.setBadgeText({ text: "OFF" });
+    chrome.action.setTitle({ title: "NetSuite Helper is turned off" });
+  } else {
+    chrome.action.getBadgeText({}).then((t) => {
+      if (t === "OFF") chrome.action.setBadgeText({ text: "" });
+      if (typeof showHelperState === "function") showHelperState();
+    });
+  }
+}
+async function checkSwitch(force) {
+  if (!force && Date.now() - switchCheckedAt < 5 * 60000) return;
+  switchCheckedAt = Date.now();
+  try {
+    const res = await fetch(SWITCH_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (res.status === 404) return setOff(false, true); // no switch file = on
+    if (!res.ok) return; // GitHub trouble: keep the last answer
+    const j = await res.json();
+    if (typeof j.on === "boolean") setOff(!j.on, true);
+  } catch (e) {} // offline: keep the last answer
+}
+chrome.alarms.create("nsh-switch", { periodInMinutes: 15 });
+chrome.alarms.onAlarm.addListener((a) => a.name === "nsh-switch" && checkSwitch(true));
+chrome.runtime.onStartup.addListener(() => checkSwitch(true));
+chrome.runtime.onInstalled.addListener(() => checkSwitch(true));
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || msg.type !== "nsh-switch-check") return;
+  checkSwitch(false).finally(() => reply({ off: pluginOff }));
+  return true;
+});
+
 // ---------- AutoPrint helper: started by the browser ----------
 // The browser starts autoprint\host.cmd (registered by Setup.cmd, no admin
 // needed), which starts the AutoPrint helper if it isn't running, restarts it if
@@ -35,6 +83,7 @@ let hostPort = null;
 let helperState = "unknown"; // running | stopped | missing
 
 function showHelperState() {
+  if (pluginOff) return; // the OFF badge stays while the switch is off
   if (helperState === "running") {
     chrome.action.setBadgeText({ text: "" });
     chrome.action.setTitle({ title: DEFAULT_TITLE });
@@ -319,6 +368,7 @@ async function slipEntry(hash) {
   return entry;
 }
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (pluginOff) return;
   if (info.status !== "complete" || !tab.url || !isPackingSlip(tab.url) || /#nsh-original$/.test(tab.url)) return;
   const seen = tabId + "|" + tab.url;
   if (slipSwapped.has(seen)) return;
@@ -342,6 +392,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
+  if (pluginOff) return flash(tab.id, "OFF", "#777777");
   // The tidied packing slip viewer: print the tidied copy it shows.
   if (tab.url && tab.url.startsWith(VIEWER)) {
     checkHelper();
@@ -410,6 +461,7 @@ chrome.downloads.onChanged.addListener(async (d) => {
 // From NetSuite pages (via content.js): save a PDF the page built to AutoPrint.
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || !/^nsh-autoprint(-url|-state)?$/.test(msg.type)) return;
+  if (pluginOff) return reply({ ok: false, error: "NetSuite Helper is turned off." });
   const from = sender.tab && sender.tab.url;
   if (!from || !isAllowedSite(from)) {
     reply({ ok: false, error: "Not a NetSuite page." });
@@ -461,6 +513,7 @@ const isInvoicePage = (url) => {
 };
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || (msg.type !== "nsh-tab-open" && msg.type !== "nsh-tab-close")) return;
+  if (pluginOff && msg.type === "nsh-tab-open") return reply({ ok: false, error: "NetSuite Helper is turned off." });
   const from = sender.tab && sender.tab.url;
   if (!from || !isAllowedSite(from)) {
     reply({ ok: false, error: "Not a NetSuite page." });

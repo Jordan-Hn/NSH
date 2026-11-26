@@ -11,6 +11,10 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
 
   // On the Bulk Waves pages this file only lends its ticket code (window.__nshTickets);
   // its own panel only appears on Print Picking Tickets.

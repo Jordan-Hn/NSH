@@ -7,6 +7,10 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
 
   if (!/Transaction_TYPE=ItemShip/i.test(location.search) || /searchid=|style=|\bresults?\b/i.test(location.search)) return;
 

@@ -19,6 +19,10 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
 
   // The search's own results page, or the Home dashboard (its portlet of the same search, 25/11/2026).
   const onResults = /[?&]searchid=146970(&|$)/.test(location.search);

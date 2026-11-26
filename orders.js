@@ -22,6 +22,10 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
 
   // Loads on the Pending Orders page and only lends window.__nshOrderExport (no panel).
   // Also on a sales order / transfer order page (view, not edit): a "Copy Tracker Row" button

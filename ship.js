@@ -13,6 +13,10 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
 
   // Lives on the Item Fulfillment search page (light; the full list page loads
   // every fulfilment since 2019): /app/common/search/search.nl?searchtype=Transaction&Transaction_TYPE=ItemShip

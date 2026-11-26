@@ -10,6 +10,10 @@
 // "#nshbill=<key>:dry" waits for the page and reports "ready-dry" without saving (tests).
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
   const put = (key, o) => {
     try {
       localStorage.setItem(key, JSON.stringify(Object.assign({ at: Date.now() }, o)));

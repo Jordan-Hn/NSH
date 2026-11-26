@@ -15,6 +15,10 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): when NetSuite Helper is turned off, leave the page alone.
+  try {
+    if (localStorage.getItem("nshOff") === "1") return;
+  } catch (e) {}
 
   const JOB_KEY = "nshBulkWavesJob"; // shared run (localStorage, all tabs)
   const TAB_KEY = "nshBulkWavesTab"; // this tab's part in it (sessionStorage)

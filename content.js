@@ -3,6 +3,19 @@
 
 (function () {
   "use strict";
+  // Off switch (27/11/2026): background.js checks the switch on GitHub; this keeps a copy in
+  // the page's own storage so the page scripts (which can't ask the extension) see it too.
+  // A change shows from the next page load.
+  let switchedOff = false;
+  try {
+    switchedOff = localStorage.getItem("nshOff") === "1";
+    chrome.runtime.sendMessage({ type: "nsh-switch-check" }, (res) => {
+      if (chrome.runtime.lastError || !res) return;
+      if (res.off) localStorage.setItem("nshOff", "1");
+      else localStorage.removeItem("nshOff");
+    });
+  } catch (e) {}
+  if (switchedOff) return;
 
   // ---------- Enter in the Helper's paste boxes ----------
   // Enter (with or without Shift) in any of the Helper's paste boxes just makes a new
