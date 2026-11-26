@@ -422,6 +422,7 @@
   function lookupOrders(orders) {
     const map = {};
     const ids = {};
+    const store = {}; // TO -> its store (To Location), for the 1/N ticket blocks
     if (typeof window.nlapiSearchRecord !== "function") return null;
     for (let i = 0; i < orders.length; i += 50) {
       const any = [];
@@ -434,7 +435,7 @@
           "transaction",
           null,
           [any, "AND", ["mainline", "is", "T"], "AND", ["type", "anyof", ["TrnfrOrd", "SalesOrd"]]],
-          [new window.nlobjSearchColumn("tranid"), new window.nlobjSearchColumn("transactionnumber")]
+          [new window.nlobjSearchColumn("tranid"), new window.nlobjSearchColumn("transactionnumber"), new window.nlobjSearchColumn("transferlocation")]
         ) || [];
       res.forEach((r) => {
         const tranid = (r.getValue("tranid") || "").toUpperCase();
@@ -442,10 +443,11 @@
         if (orders.includes(tranid) && digits) {
           map[tranid] = digits;
           ids[tranid] = r.getId();
+          if (tranid.startsWith("TO")) store[tranid] = r.getText("transferlocation") || "";
         }
       });
     }
-    return { tn: map, ids, loc: lookupLocations(ids) };
+    return { tn: map, ids, loc: lookupLocations(ids), store };
   }
 
   // Which warehouse each order is waved at. Sales orders: where their stock lines
@@ -1156,7 +1158,7 @@
           (missing.length ? '<p class="nsh-wave-warn">Not found in NetSuite: ' + missing.map(esc).join(", ") + "</p>" : "") +
           (parsed.bad.length ? '<p class="nsh-wave-warn">Ignored: ' + parsed.bad.map(esc).join(", ") + "</p>" : "") +
           (toWave.length
-            ? delBoxes(toWave, {}) +
+            ? delBoxes(toWave, {}, found.store) +
               '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-wave-autoprint"' + (localStorage.getItem("nshWavesAutoPrint") === "1" ? " checked" : "") + '> Send the picking tickets to AutoPrint when the waves are done</label>' +
               '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-wave-go">Create ' +
               toWave.length + " Wave" + (toWave.length > 1 ? "s" : "") + "</button></div>"
@@ -1182,7 +1184,7 @@
             const started = await updateJob((cur) => {
               if (cur && !cur.stopped && !isFinished(cur)) return false;
               const autoPrint = !!(box.querySelector("#nsh-wave-autoprint") || {}).checked;
-              writeJob(Object.assign(buildJob(parsed, tn, found.ids, reWave ? {} : already, already), { loc: found.loc || {}, autoPrint, printState: "", del: readDels() }));
+              writeJob(Object.assign(buildJob(parsed, tn, found.ids, reWave ? {} : already, already), { loc: found.loc || {}, autoPrint, printState: "", del: readDels(), store: found.store || {} }));
               return true;
             });
             if (!started) {
@@ -1311,13 +1313,28 @@
   // Delivery date boxes for store tickets (26/11/2026): "DEL: 2/12" stamped next to the
   // wave, as the SOP has it written. Optional: a blank box = no DEL stamp. One box sets
   // them all; each ticket can then be changed. dels = { TO: "2026-12-02" }.
-  function delBoxes(orders, dels) {
+  // stores = { TO: store name }: the TOs are shown in their store blocks (1/6, 2/6...) like
+  // Bulk Print, and only the first ticket of each block gets a box (the date goes on that one).
+  function delBoxes(orders, dels, stores) {
     const tos = orders.filter((o) => o.startsWith("TO"));
     if (!tos.length) return "";
+    const st = stores || {};
+    const count = {};
+    tos.forEach((o) => (count[st[o]] = (count[st[o]] || 0) + 1));
+    const seen = {};
     return (
       '<label class="nsh-label">Delivery date (all store tickets)</label><input type="date" class="nsh-del-all">' +
-      '<table class="nsh-wave-table"><tr><th>Order</th><th>Delivery</th></tr>' +
-      tos.map((o) => "<tr><td>" + esc(o) + '</td><td><input type="date" class="nsh-del" data-order="' + esc(o) + '" value="' + esc((dels || {})[o] || "") + '"></td></tr>').join("") +
+      '<table class="nsh-wave-table"><tr><th>Order</th><th>Store</th><th>Ticket</th><th>Delivery</th></tr>' +
+      tos
+        .map((o) => {
+          const n = (seen[st[o]] = (seen[st[o]] || 0) + 1);
+          return (
+            "<tr><td>" + esc(o) + "</td><td>" + esc(String(st[o] || "").replace(/^Stores : /, "")) + "</td><td>" + n + "/" + count[st[o]] + "</td><td>" +
+            (n === 1 ? '<input type="date" class="nsh-del" data-order="' + esc(o) + '" value="' + esc((dels || {})[o] || "") + '">' : "") +
+            "</td></tr>"
+          );
+        })
+        .join("") +
       "</table>"
     );
   }
@@ -1417,7 +1434,7 @@
           '<button type="button" id="nsh-wave-tickets-auto">Send Tickets to AutoPrint</button>' +
           '<button type="button" id="nsh-wave-tickets-print">Print Tickets</button>' +
           '<button type="button" id="nsh-wave-tickets-open">Open Tickets PDF</button></div>' +
-          '<div id="nsh-wave-dels">' + delBoxes(ticketOrders, job.del) + "</div>" +
+          '<div id="nsh-wave-dels">' + delBoxes(ticketOrders, job.del, job.store) + "</div>" +
           '<p class="nsh-wave-hint" id="nsh-wave-print-status">' +
           (job.printState === "done" ? "Picking tickets were sent to AutoPrint." : "Picking tickets for the waved orders, in list order, stamped like Bulk Print. Fetching them marks them Picking Ticket Printed.") +
           "</p>"

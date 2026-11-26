@@ -97,8 +97,13 @@
 /* NetSuite buttons: grey by default, blue for the main action. */
 .nsh-wave-actions {
   display: flex;
+  flex-wrap: wrap; /* buttons go onto a second row instead of squashing (27/11/2026) */
   gap: 8px;
   margin: 8px 0;
+}
+.nsh-wave-actions button {
+  white-space: nowrap; /* labels stay on one line; they spilled out of the fixed-height buttons */
+  flex: 0 0 auto;
 }
 .nsh-wave-panel button,
 .nsh-wave-bar button {
