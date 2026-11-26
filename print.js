@@ -321,7 +321,9 @@
         }
         // Store tickets: the delivery date in the empty space between the company address and
         // the "Picking Ticket" block (26/11/2026), same style as the wave ("DEL: 2/12").
-        if (s.del) {
+        // Only the first ticket of a store's block (1/6, not 2/6...) gets the date, as the SOP
+        // has it written once per store (26/11/2026).
+        if (s.del && (!/^\d+\/\d+$/.test(s.code || "") || /^1\//.test(s.code))) {
           const dx = 252;
           const dy = height - 106;
           pages[0].drawText("DEL: ", { x: dx, y: dy, size: small, font });
@@ -423,7 +425,8 @@
       // Store tickets (TOs) get the store's delivery date, as "DEL: 2/12" (26/11/2026),
       // picked here: one date for all, changeable per ticket. Blank = no DEL stamp.
       const hasTO = toPrint.some((o) => o.startsWith("TO"));
-      const delCell = (o) => (o.startsWith("TO") ? '<input type="date" class="nsh-print-del" data-order="' + esc(o) + '">' : "");
+      // A box only on the first ticket of each store's block (code 1/N): the date goes on that one.
+      const delCell = (o) => (o.startsWith("TO") && /^1\//.test(stamps[o].code || "") ? '<input type="date" class="nsh-print-del" data-order="' + esc(o) + '">' : "");
 
       const warnings = [];
       if (noWave.length) warnings.push("No wave yet (ticket stamped NO WAVE):\n  " + noWave.join("\n  "));
@@ -628,6 +631,11 @@
           const stamps = buildStamps(list, info, {});
           // dels = { TO: "2026-12-02" }: delivery dates picked on the Bulk Waves screen.
           list.forEach((o) => { if (dels && dels[o] && o.startsWith("TO")) stamps[o].del = shortDate(dels[o]); });
+          // The date goes on the first ticket of each store's block only; if that one was left
+          // blank, the first date given for another ticket of the same store is used.
+          const blockDel = {};
+          list.forEach((o) => { const st = info[o].store; if (o.startsWith("TO") && stamps[o].del && !blockDel[st]) blockDel[st] = stamps[o].del; });
+          list.forEach((o) => { if (!o.startsWith("TO")) return; stamps[o].del = /^1\//.test(stamps[o].code || "") ? blockDel[info[o].store] || "" : ""; });
           const parts = [];
           const partStamps = [];
           const done = [];

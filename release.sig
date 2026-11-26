@@ -1,5 +1,5 @@
 {
-    "version":  "0.27.1",
+    "version":  "0.27.2",
     "files":  [
                   {
                       "path":  "autobill.js",
@@ -279,7 +279,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "CD10025F74BAA0B6EB039D8C3741EB05EE4E6708BD6E36D6BD0F2D2AA25F2E68"
+                      "sha256":  "81BE00F55CBFF4693D7CE6982D82058B90A3A7BF85BF8A28E9FBED3447C873E4"
                   },
                   {
                       "path":  "orders.js",
@@ -287,7 +287,7 @@
                   },
                   {
                       "path":  "print.js",
-                      "sha256":  "14E2A3D1CFA5FB90CFCA7AAD6C07097170C72722BF65E7E7C2CA3B5D55FD8546"
+                      "sha256":  "BA6F8B0F97C4A2048C0630EC9EB13254FA80556C841E59B8DBDE452D929EB91E"
                   },
                   {
                       "path":  "ship.js",
@@ -307,12 +307,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "4E749BFB580CB1E3347F23230E43880D97A3A11C7A378A23E50A3AFC46107F36"
+                      "sha256":  "6B98695D1C8776B298A885C846CEE9C87886C0014BC18B158CFBAF0290980CC8"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "D3EF5674EE4F4016FC3E14DB2A2982C3D3908090D7BCD5C30CE97119B47C6500"
                   }
               ],
-    "signature":  "Iw6Ozl93HzQQDl5th8RXIT0DBtLdV27PgULugerDuBu7Cz8zUwSziNMWXqnKKK/yX/UlmlAmsVi+L99ZRXFfVupHADs6q/Km9Y8KEOKPaDUJQlNLbR97XDg5YhCsu4gfObpW/Llp3yDgY0qEwAJ0gs5+Ji6LZdTPyL8NIBxILTLY0HHp9joXzeKX3/c7Jq/U/pUXzzVwYqBEfljZsyOISVhulTc4hzsFKOW+z/queB1LINGZPx2TYgDQJJ3ZVGvQkanQLpt8WZqfYRIN7HhLSlOongruImnxdNkP9+sM/oiV0/KuqfzP9m0mj5Hl7MdXvpAJik9A7TQ0E7w1ulmJokwZiuFG7ILbLvrkWBgccnL8i9quJUibmwcRAx4BYTgOHFAf6GJU7IGZ9ppBlpGm9fkOhQyFKRlQAfkZCs+jRIv7Wh/52YVkivO+6qHJ+lZ7JUB9DUjnKuhQAs2Vmb7NmBQ8uvTJieOzKvBbzl7b9pe0vK4vVOu/Mk1SXHP4+vI8"
+    "signature":  "PDVOzbUmYqSKdXKP06oZOKGC/xvZvI+X2+6diBT0yUHIrIvJF4Atsmd5MoEfnorNj9J0yXuYYUb46XciENSLKgxi6we8phh4xoyeq9eQHeiu/yudqvf7b8rWfiM8Pk9RIwFDK+h7svu348cRnxmDjBTrjhUa3CHYiMonAWvl73hXTY62AQLsbAgwozbzp/xOnZj9JvBbf0SGhqLuBVw5H0mNU35LqyKSrMZFAyut0TwUU2JXPRpkZTybbghsP2T3+gujNm26OHmhfaGdJ7e08pJoqCqio9+1JPAG0myuci9xCPM8xcbKR3bPsrzV9QvYrEjFzviRN4/Bh0qD34Z9qyIWLmzKW/RzmlDEblA0N9CdWBxTfUe87btPvXFuZi7hl3rYU/NsDgV5fm8YlPzDpTuncj5fmYR0WLBUzLWkvK+uCNcMDbFNlv1MErL063clj1o/CqvKPWn1QZzfEwjIFvHReWn+0vzb4s75HBOq9HPITgUd+zw+Xo0a1KrjPMI6"
 }
