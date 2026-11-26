@@ -115,6 +115,12 @@
     return STATE_NAMES[String(s || "").trim().toUpperCase()] || "";
   }
 
+  // A date box's value ("2026-12-02") as the SOP writes it on a store ticket: "2/12".
+  function shortDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? Number(m[3]) + "/" + Number(m[2]) : "";
+  }
+
   // How the stamp reads (for the check screen); on the ticket "WAVE:" is small.
   function stampText(s) {
     return [s.wave ? "WAVE: " + s.wave : "NO WAVE", s.code].filter(Boolean).join("    ");
@@ -313,6 +319,14 @@
         } else {
           pages[0].drawText("NO WAVE", { x: wx, y: wy, size: big, font });
         }
+        // Store tickets: the delivery date in the empty space between the company address and
+        // the "Picking Ticket" block (26/11/2026), same style as the wave ("DEL: 2/12").
+        if (s.del) {
+          const dx = 252;
+          const dy = height - 106;
+          pages[0].drawText("DEL: ", { x: dx, y: dy, size: small, font });
+          pages[0].drawText(s.del, { x: dx + font.widthOfTextAtSize("DEL: ", small), y: dy, size: big, font });
+        }
         if (s.code) {
           pages[0].drawText(s.code, { x: width - 36 - font.widthOfTextAtSize(s.code, big), y, size: big, font });
         }
@@ -406,6 +420,11 @@
         );
       };
 
+      // Store tickets (TOs) get the store's delivery date, as "DEL: 2/12" (26/11/2026),
+      // picked here: one date for all, changeable per ticket. Blank = no DEL stamp.
+      const hasTO = toPrint.some((o) => o.startsWith("TO"));
+      const delCell = (o) => (o.startsWith("TO") ? '<input type="date" class="nsh-print-del" data-order="' + esc(o) + '">' : "");
+
       const warnings = [];
       if (noWave.length) warnings.push("No wave yet (ticket stamped NO WAVE):\n  " + noWave.join("\n  "));
       if (badRow.length) warnings.push("Couldn't read the courier/state from the row (no code stamped):\n  " + badRow.join("\n  "));
@@ -417,9 +436,12 @@
       box.innerHTML =
         (toPrint.length
           ? "<p><b>" + toPrint.length + " ticket" + (toPrint.length > 1 ? "s" : "") + ", in this order:</b></p>" +
-            '<table class="nsh-wave-table"><tr><th>Order</th><th>Wave</th><th>Code</th></tr>' +
+            (hasTO
+              ? '<label class="nsh-label" for="nsh-print-del-all">Delivery date (all store tickets)</label><input type="date" id="nsh-print-del-all">'
+              : "") +
+            '<table class="nsh-wave-table"><tr><th>Order</th><th>Wave</th><th>Code</th>' + (hasTO ? "<th>Delivery</th>" : "") + "</tr>" +
             toPrint
-              .map((o) => "<tr><td>" + esc(o) + "</td><td>" + esc(stamps[o].wave || "NO WAVE") + "</td><td>" + codeCell(o) + "</td></tr>")
+              .map((o) => "<tr><td>" + esc(o) + "</td><td>" + esc(stamps[o].wave || "NO WAVE") + "</td><td>" + codeCell(o) + "</td>" + (hasTO ? "<td>" + delCell(o) + "</td>" : "") + "</tr>")
               .join("") +
             "</table>" +
             '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-print-stamp" checked> Stamp these on the tickets (wave under the address, code top right)</label>' +
@@ -435,15 +457,18 @@
             toPrint.length + " Ticket" + (toPrint.length > 1 ? "s" : "") + "</button></div>" +
             '<p class="nsh-wave-hint">Each order is marked Picking Ticket Printed, the same as printing it by hand.</p>'
           : "");
+      const all = box.querySelector("#nsh-print-del-all");
+      if (all) all.onchange = () => box.querySelectorAll(".nsh-print-del").forEach((inp) => (inp.value = all.value));
       const go = box.querySelector("#nsh-print-go");
       if (go) {
         go.onclick = () => {
           if (!box.querySelector("#nsh-print-stamp").checked) return build(toPrint, info, text, null);
-          // Use whatever code was picked in each dropdown.
+          // Use whatever code was picked in each dropdown, and each ticket's delivery date.
           const texts = {};
           toPrint.forEach((o) => {
             const sel = box.querySelector('.nsh-print-code[data-order="' + o + '"]');
-            texts[o] = { wave: stamps[o].wave, code: sel ? sel.value : stamps[o].code };
+            const del = box.querySelector('.nsh-print-del[data-order="' + o + '"]');
+            texts[o] = { wave: stamps[o].wave, code: sel ? sel.value : stamps[o].code, del: del ? shortDate(del.value) : "" };
           });
           build(toPrint, info, text, texts);
         };
@@ -590,17 +615,19 @@
   }
 
   // Ticket building for Bulk Waves (same tickets, stamps and order as Bulk Print).
-  // ticketsPdf(orders, onProgress) -> { bytes, done: [orders], failed: [{order, error}] }
+  // ticketsPdf(orders, onProgress, dels) -> { bytes, done: [orders], failed: [{order, error}] }
   // Fetching a ticket marks the order Picking Ticket Printed, like printing it by hand.
   if (ON_WAVE_PAGES) {
     window.__nshTickets = {
-      async ticketsPdf(orders, onProgress) {
+      async ticketsPdf(orders, onProgress, dels) {
         if (typeof window.PDFLib === "undefined") throw new Error("the PDF tool didn't load. Reload the extension and refresh this page");
         window.__nshBusy = true;
         try {
           const info = lookup(orders);
           const list = orders.filter((o) => info[o]);
           const stamps = buildStamps(list, info, {});
+          // dels = { TO: "2026-12-02" }: delivery dates picked on the Bulk Waves screen.
+          list.forEach((o) => { if (dels && dels[o] && o.startsWith("TO")) stamps[o].del = shortDate(dels[o]); });
           const parts = [];
           const partStamps = [];
           const done = [];

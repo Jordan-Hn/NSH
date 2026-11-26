@@ -1156,10 +1156,12 @@
           (missing.length ? '<p class="nsh-wave-warn">Not found in NetSuite: ' + missing.map(esc).join(", ") + "</p>" : "") +
           (parsed.bad.length ? '<p class="nsh-wave-warn">Ignored: ' + parsed.bad.map(esc).join(", ") + "</p>" : "") +
           (toWave.length
-            ? '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-wave-autoprint"' + (localStorage.getItem("nshWavesAutoPrint") === "1" ? " checked" : "") + '> Send the picking tickets to AutoPrint when the waves are done</label>' +
+            ? delBoxes(toWave, {}) +
+              '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-wave-autoprint"' + (localStorage.getItem("nshWavesAutoPrint") === "1" ? " checked" : "") + '> Send the picking tickets to AutoPrint when the waves are done</label>' +
               '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-wave-go">Create ' +
               toWave.length + " Wave" + (toWave.length > 1 ? "s" : "") + "</button></div>"
             : "");
+        const readDels = wireDelBoxes(box);
         // The AutoPrint tick is remembered in this browser (26/11/2026).
         const apBox = box.querySelector("#nsh-wave-autoprint");
         if (apBox)
@@ -1180,7 +1182,7 @@
             const started = await updateJob((cur) => {
               if (cur && !cur.stopped && !isFinished(cur)) return false;
               const autoPrint = !!(box.querySelector("#nsh-wave-autoprint") || {}).checked;
-              writeJob(Object.assign(buildJob(parsed, tn, found.ids, reWave ? {} : already, already), { loc: found.loc || {}, autoPrint, printState: "" }));
+              writeJob(Object.assign(buildJob(parsed, tn, found.ids, reWave ? {} : already, already), { loc: found.loc || {}, autoPrint, printState: "", del: readDels() }));
               return true;
             });
             if (!started) {
@@ -1306,9 +1308,41 @@
 
   // ---------- picking tickets for the waved orders ----------
 
+  // Delivery date boxes for store tickets (26/11/2026): "DEL: 2/12" stamped next to the
+  // wave, as the SOP has it written. Optional: a blank box = no DEL stamp. One box sets
+  // them all; each ticket can then be changed. dels = { TO: "2026-12-02" }.
+  function delBoxes(orders, dels) {
+    const tos = orders.filter((o) => o.startsWith("TO"));
+    if (!tos.length) return "";
+    return (
+      '<label class="nsh-label">Delivery date (all store tickets)</label><input type="date" class="nsh-del-all">' +
+      '<table class="nsh-wave-table"><tr><th>Order</th><th>Delivery</th></tr>' +
+      tos.map((o) => "<tr><td>" + esc(o) + '</td><td><input type="date" class="nsh-del" data-order="' + esc(o) + '" value="' + esc((dels || {})[o] || "") + '"></td></tr>').join("") +
+      "</table>"
+    );
+  }
+  // Wires the boxes; returns a function that reads them. onChange(dels) after any change.
+  function wireDelBoxes(root, onChange) {
+    const all = root.querySelector(".nsh-del-all");
+    const boxes = [...root.querySelectorAll(".nsh-del")];
+    const read = () => {
+      const d = {};
+      boxes.forEach((b) => b.value && (d[b.dataset.order] = b.value));
+      return d;
+    };
+    if (all)
+      all.onchange = () => {
+        boxes.forEach((b) => (b.value = all.value));
+        if (onChange) onChange(read());
+      };
+    boxes.forEach((b) => (b.onchange = () => onChange && onChange(read())));
+    return read;
+  }
+
   let ticketCache = null; // { key, bytes, url, done, failed }
   async function buildTickets(orders, status, btn) {
-    const key = orders.join(",");
+    const dels = (readJob() || {}).del || {};
+    const key = orders.join(",") + "|" + JSON.stringify(dels);
     if (ticketCache && ticketCache.key === key) return ticketCache;
     if (!window.__nshTickets) {
       alert("Bulk waves: the ticket printer didn't load. Reload the extension and refresh this page.");
@@ -1318,7 +1352,7 @@
     try {
       const res = await window.__nshTickets.ticketsPdf(orders, (i, n) => {
         if (status) status.textContent = i < n ? "Getting picking tickets... " + i + " of " + n : "Joining " + n + " tickets...";
-      });
+      }, dels);
       if (!res.bytes) throw new Error(res.failed.map((f) => f.order + ": " + f.error).join("; ") || "no tickets");
       const url = URL.createObjectURL(new Blob([res.bytes], { type: "application/pdf" }));
       ticketCache = { key, bytes: res.bytes, url, done: res.done, failed: res.failed };
@@ -1357,6 +1391,10 @@
 
   function renderResults(panel, job) {
     panelMode = "results";
+    const waveOf = {};
+    job.items.forEach((it) => (waveOf[it.order] = it.state === "done" ? it.wave : ""));
+    const seenT = new Set();
+    const ticketOrders = job.all.filter((o) => waveOf[o] && !seenT.has(o) && seenT.add(o));
     const remaining = job.items.filter((x) => x.state === "pending" || ACTIVE.includes(x.state) || (x.state === "error" && !x.wave)).length;
     const dupeLines = job.all.length - new Set(job.all).size;
     const problems = job.items.filter((x) => x.state === "skipped" || x.state === "error" || x.note === "Out of order").length;
@@ -1379,6 +1417,7 @@
           '<button type="button" id="nsh-wave-tickets-auto">Send Tickets to AutoPrint</button>' +
           '<button type="button" id="nsh-wave-tickets-print">Print Tickets</button>' +
           '<button type="button" id="nsh-wave-tickets-open">Open Tickets PDF</button></div>' +
+          '<div id="nsh-wave-dels">' + delBoxes(ticketOrders, job.del) + "</div>" +
           '<p class="nsh-wave-hint" id="nsh-wave-print-status">' +
           (job.printState === "done" ? "Picking tickets were sent to AutoPrint." : "Picking tickets for the waved orders, in list order, stamped like Bulk Print. Fetching them marks them Picking Ticket Printed.") +
           "</p>"
@@ -1386,15 +1425,13 @@
       '<p class="nsh-wave-hint">Wave numbers copy one per line in the order you pasted, duplicates included, for the tracker\'s WAVE column. Skipped orders copy as a blank line.</p>'
     );
 
-    const waveOf = {};
-    job.items.forEach((it) => (waveOf[it.order] = it.state === "done" ? it.wave : ""));
+    const delsBox = panel.querySelector("#nsh-wave-dels");
+    if (delsBox) wireDelBoxes(delsBox, (d) => updateJob((j) => j && (j.del = d)));
     panel.querySelector("#nsh-wave-copy").onclick = (e) => copy(job.all.map((o) => waveOf[o] || "").join("\n"), e.target);
     panel.querySelector("#nsh-wave-copy-both").onclick = (e) =>
       copy(job.all.map((o) => o + "\t" + (waveOf[o] || "")).join("\n"), e.target);
     // Picking tickets for the waved orders, built here by Bulk Print's own code
     // (print.js lends it as window.__nshTickets): send to AutoPrint, print, or open.
-    const seenT = new Set();
-    const ticketOrders = job.all.filter((o) => waveOf[o] && !seenT.has(o) && seenT.add(o));
     const status = panel.querySelector("#nsh-wave-print-status");
     const ticketBtn = (id, fn) => {
       const b = panel.querySelector(id);
