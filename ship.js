@@ -1817,10 +1817,9 @@
       }
     });
     let finishedCount = work.length - todo.length;
-    // Manual print: paperwork is collected here (still in pasted order) instead of sent.
+    // Manual print: nothing goes to AutoPrint. Either way the two PDFs are offered at the end.
     const manual = !dry && !autoPrintOn();
-    const collected = [];
-    const send = manual ? async (job) => collected.push(job) : undefined;
+    const send = manual ? async () => {} : undefined;
     manualPdfs = null;
     const title = () => (dry ? "Dry Run: " : "Shipping: ") + finishedCount + " of " + work.length + " done";
     let nextTodo = 0;
@@ -1845,9 +1844,13 @@
         Object.assign(work[k], { result: "failed", finished: true, note: "Not started: NetSuite's usage limit was hit. Use Retry Failed." });
       });
     await flushPrints(work, draw, title, send);
-    if (manual && collected.length) {
+    // Every finished order's paperwork in pasted order (earlier runs of this job too, so
+    // the PDFs after a Retry Failed hold the whole list). Offered with AutoPrint on as well.
+    const allJobs = work.filter((p) => p.result === "done").flatMap((p) => p.prints || []);
+    if (allJobs.length) {
       try {
-        manualPdfs = await mergeForManual(collected);
+        manualPdfs = await mergeForManual(allJobs);
+        manualPdfs.manual = manual;
       } catch (err) {
         alert("Ship orders: couldn't put the paperwork into PDFs: " + err.message + "\n\nThe orders themselves are fine. Print the paperwork from NetSuite.");
       }
@@ -1911,8 +1914,8 @@
           '<button type="button" id="nsh-ship-copy-both">Copy Orders + Connotes</button>' +
           '<button type="button" id="nsh-ship-copy">Copy Rows</button>'
         : "") +
-      (manualPdfs && manualPdfs.labels ? '<button type="button" class="nsh-primary" id="nsh-ship-pdf-labels">Open Labels PDF (' + manualPdfs.labels.count + ")</button>" : "") +
-      (manualPdfs && manualPdfs.papers ? '<button type="button" class="nsh-primary" id="nsh-ship-pdf-papers">Open Invoices and Packing Slips PDF (' + manualPdfs.papers.count + ")</button>" : "") +
+      (manualPdfs && manualPdfs.labels ? '<button type="button"' + (manualPdfs.manual ? ' class="nsh-primary"' : "") + ' id="nsh-ship-pdf-labels">Open Labels PDF (' + manualPdfs.labels.count + ")</button>" : "") +
+      (manualPdfs && manualPdfs.papers ? '<button type="button"' + (manualPdfs.manual ? ' class="nsh-primary"' : "") + ' id="nsh-ship-pdf-papers">Open Invoices and Packing Slips PDF (' + manualPdfs.papers.count + ")</button>" : "") +
       (failed.length ? '<button type="button" id="nsh-ship-retry">Retry Failed</button>' : "") +
       (dry && localStorage.getItem(DRY_KEY) !== "1" && work.some((p) => p.result === "dry")
         ? '<button type="button" class="nsh-primary" id="nsh-ship-real">' + (work.every((w) => w.row.isTO) ? "Ship" : "Ship and Bill") + (dryShown() ? " for Real" : "") + "</button>"
@@ -1972,7 +1975,7 @@
     if (retry) retry.onclick = () => run(plans, work, text, dry);
     after.querySelector("#nsh-ship-new").onclick = () => renderInput("");
     if (quiet) return;
-    if (manualPdfs && manualPdfs.missed.length) alert("Ship orders: these couldn't go into the PDFs, so print them from NetSuite:\n\n" + manualPdfs.missed.join("\n"));
+    if (manualPdfs && manualPdfs.manual && manualPdfs.missed.length) alert("Ship orders: these couldn't go into the PDFs, so print them from NetSuite:\n\n" + manualPdfs.missed.join("\n"));
     const printProblems = work.filter((p) => p.printError);
     if (printProblems.length) {
       alert("Ship orders: some paperwork didn't print (the orders themselves are fine):\n\n" + printProblems.map((p) => p.row.so + ": " + p.printError).join("\n") + "\n\nPrint these by hand, or check AutoPrint is running.");
