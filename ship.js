@@ -1513,7 +1513,6 @@
       "Ship Orders (Pasted Tracker Rows)",
       '<label class="nsh-label" for="nsh-ship-input">Rows from the CWS or Retail tracker</label>' +
         '<textarea id="nsh-ship-input" rows="6" placeholder="SO123456&#9;Customer name&#9;VIC&#9;CHILL&#9;&#9;3CTNS"></textarea>' +
-        '<p class="nsh-wave-hint">Copy whole rows (dates and other columns are fine). Each order is shipped and billed: Shipped, shipping method, packages, Save, labels, Bill, invoice. Store orders (TOs) go Chill Express with the DELIVERY date, get labels and a packing slip, and are never billed. Everything prints through AutoPrint. You check the list before anything happens.</p>' +
         '<div class="nsh-wave-actions"><button type="button" id="nsh-ship-check">Check List</button></div>' +
         '<div id="nsh-ship-confirm"></div>' +
         restoreOffer()
@@ -1621,7 +1620,6 @@
         )
         .join("") +
       "</table>" +
-      (toShip.some((p) => p.row.courier === "FW") ? '<p class="nsh-wave-hint">Freeway starts on the Standard methods. For urgent ones, pick VIP or Premium in the Method box.</p>' : "") +
       (toShip.length
         ? '<label class="nsh-print-stamp" id="nsh-ship-dry-row"' + (dryShown() ? "" : ' style="display:none"') + '><input type="checkbox" id="nsh-ship-dry"' + (localStorage.getItem(DRY_KEY) === "1" ? " checked disabled" : "") + "> Dry run (fill each order in, don't save anything)</label>" +
           '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-ship-autoprint"' + (autoPrintOn() ? " checked" : "") + "> Send paperwork to AutoPrint</label>" +
@@ -1925,9 +1923,7 @@
         ? '<button type="button" class="nsh-primary" id="nsh-ship-real">' + (work.every((w) => w.row.isTO) ? "Ship" : "Ship and Bill") + (dryShown() ? " for Real" : "") + "</button>"
         : "") +
       '<button type="button" id="nsh-ship-new">New List</button></div>' +
-      (!dry && done.length
-        ? '<p class="nsh-wave-hint">Connotes copy one per line in the order you pasted, for the tracker\'s CONNOTE # column. Rows that weren\'t shipped copy their old connote, or a blank line. Click any connote or invoice number to copy just that one.</p>'
-        : "");
+      "";
     bindCopyables(after);
     const out = after.querySelector("#nsh-ship-out");
     if (out) out.value = pasteBack(plans);

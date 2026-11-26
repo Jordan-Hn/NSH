@@ -373,7 +373,6 @@
       "Bulk Print (Pasted List)",
       '<label class="nsh-label" for="nsh-print-input">TO or SO numbers</label>' +
         '<textarea id="nsh-print-input" rows="6" placeholder="TO12345&#10;TO12346&#10;SO123456"></textarea>' +
-        '<p class="nsh-wave-hint">One per line, or paste whole rows from the tracker. Tickets come out as one PDF in this order, the same as each order\'s own Print Picking Ticket button, with the wave number stamped under the address and the code top right.</p>' +
         '<div class="nsh-wave-actions"><button type="button" id="nsh-print-check">Check List</button></div>' +
         '<div id="nsh-print-confirm"></div>'
     );
@@ -451,18 +450,14 @@
               .map((o) => "<tr><td>" + esc(o) + "</td><td>" + esc(stamps[o].wave || "NO WAVE") + "</td><td>" + codeCell(o) + "</td>" + (hasTO ? "<td>" + delCell(o) + "</td>" : "") + "</tr>")
               .join("") +
             "</table>" +
-            '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-print-stamp" checked> Stamp these on the tickets (wave under the address, code top right)</label>' +
-            (hasSO
-              ? '<p class="nsh-wave-hint">Sales orders show their ship-to state (the CHILL code, ACT as NSW). For STE/STP, Freeway or pickup orders pick ST, FW or PU. Pasting whole CWS tracker rows sets these for you.</p>'
-              : "")
+            '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-print-stamp" checked> Stamp these on the tickets (wave under the address, code top right)</label>'
           : '<p class="nsh-wave-warn">None of these can be printed.</p>') +
         (parsed.dupes.length ? '<p class="nsh-wave-warn">Duplicates (printed once): ' + parsed.dupes.map(esc).join(", ") + "</p>" : "") +
         (missing.length ? '<p class="nsh-wave-warn">Not found in NetSuite: ' + missing.map(esc).join(", ") + "</p>" : "") +
         (parsed.bad.length ? '<p class="nsh-wave-warn">Ignored: ' + parsed.bad.map(esc).join(", ") + "</p>" : "") +
         (toPrint.length
           ? '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-print-go">Print ' +
-            toPrint.length + " Ticket" + (toPrint.length > 1 ? "s" : "") + "</button></div>" +
-            '<p class="nsh-wave-hint">Each order is marked Picking Ticket Printed, the same as printing it by hand.</p>'
+            toPrint.length + " Ticket" + (toPrint.length > 1 ? "s" : "") + "</button></div>"
           : "");
       const all = box.querySelector("#nsh-print-del-all");
       if (all) all.onchange = () => box.querySelectorAll(".nsh-print-del").forEach((inp) => (inp.value = all.value));
@@ -552,7 +547,7 @@
         '<button type="button" id="nsh-print-print">Print</button>' +
         '<a class="nsh-print-open" id="nsh-print-open" href="' + lastPdfUrl + '" target="_blank" rel="noopener">Open PDF</a>' +
         '<button type="button" id="nsh-print-new">New List</button></div>' +
-        '<p class="nsh-wave-hint" id="nsh-print-status">Tickets are in the order you pasted. Send to AutoPrint prints them on the page printer with no dialog (the AutoPrint helper must be running). Print opens the normal print dialog.</p>'
+        '<p class="nsh-wave-hint" id="nsh-print-status"></p>'
     );
     const panel = getPanel();
     const status = panel.querySelector("#nsh-print-status");

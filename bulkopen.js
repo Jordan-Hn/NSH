@@ -111,7 +111,6 @@
       '<div class="nsh-fg-body">' +
       '<label class="nsh-label" for="nsh-open-input">Record numbers, store POs, connotes or waves</label>' +
       '<textarea id="nsh-open-input" rows="4" placeholder="TO12345&#10;SO123456"></textarea>' +
-      '<p class="nsh-wave-hint">One per line, or paste whole tracker rows. Each opens in its own tab, in this order. Needs pop-ups allowed for NetSuite.</p>' +
       '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-open-go">Open in Tabs</button></div>' +
       '<div id="nsh-open-result"></div></div>';
     p.querySelector(".nsh-fg-title").onclick = () => p.classList.toggle("nsh-collapsed");

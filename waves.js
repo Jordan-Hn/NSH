@@ -1069,7 +1069,6 @@
       "Bulk Waves",
       '<label class="nsh-label" for="nsh-wave-input">TO or SO numbers</label>' +
         '<textarea id="nsh-wave-input" rows="6" placeholder="TO12345&#10;SO123456&#10;800012345"></textarea>' +
-        '<p class="nsh-wave-hint">One per line. Each gets its own wave (at its own warehouse, Multiple Orders), numbered in list order.</p>' +
         '<div class="nsh-wave-actions"><button type="button" id="nsh-wave-check">Check List</button></div>' +
         '<div id="nsh-wave-confirm"></div>'
     );
@@ -1440,10 +1439,9 @@
           '<button type="button" id="nsh-wave-tickets-open">Open Tickets PDF</button></div>' +
           '<div id="nsh-wave-dels">' + delBoxes(ticketOrders, job.del, job.store) + "</div>" +
           '<p class="nsh-wave-hint" id="nsh-wave-print-status">' +
-          (job.printState === "done" ? "Picking tickets were sent to AutoPrint." : "Picking tickets for the waved orders, in list order, stamped like Bulk Print. Fetching them marks them Picking Ticket Printed.") +
+          (job.printState === "done" ? "Picking tickets were sent to AutoPrint." : "") +
           "</p>"
-        : "") +
-      '<p class="nsh-wave-hint">Wave numbers copy one per line in the order you pasted, duplicates included, for the tracker\'s WAVE column. Skipped orders copy as a blank line.</p>'
+        : "")
     );
 
     const delsBox = panel.querySelector("#nsh-wave-dels");
