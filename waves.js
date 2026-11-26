@@ -1156,10 +1156,18 @@
           (missing.length ? '<p class="nsh-wave-warn">Not found in NetSuite: ' + missing.map(esc).join(", ") + "</p>" : "") +
           (parsed.bad.length ? '<p class="nsh-wave-warn">Ignored: ' + parsed.bad.map(esc).join(", ") + "</p>" : "") +
           (toWave.length
-            ? '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-wave-autoprint"> Send the picking tickets to AutoPrint when the waves are done</label>' +
+            ? '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-wave-autoprint"' + (localStorage.getItem("nshWavesAutoPrint") === "1" ? " checked" : "") + '> Send the picking tickets to AutoPrint when the waves are done</label>' +
               '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-wave-go">Create ' +
               toWave.length + " Wave" + (toWave.length > 1 ? "s" : "") + "</button></div>"
             : "");
+        // The AutoPrint tick is remembered in this browser (26/11/2026).
+        const apBox = box.querySelector("#nsh-wave-autoprint");
+        if (apBox)
+          apBox.onchange = () => {
+            try {
+              localStorage.setItem("nshWavesAutoPrint", apBox.checked ? "1" : "0");
+            } catch (e) {}
+          };
         const go = box.querySelector("#nsh-wave-go");
         if (go) {
           go.onclick = async () => {

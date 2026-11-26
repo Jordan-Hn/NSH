@@ -1,5 +1,5 @@
 {
-    "version":  "0.26.6",
+    "version":  "0.26.8",
     "files":  [
                   {
                       "path":  "autobill.js",
@@ -7,7 +7,7 @@
                   },
                   {
                       "path":  "autoprint\\AutoPrint.ps1",
-                      "sha256":  "2AFDAC62F2F5EF08D94AAD7FB2FAF58F11BD7A4BDB1CE182E495D58520ECD104"
+                      "sha256":  "ADF98966DEFACDAC1CE2104C9EC4D89EA1CB52FFCF3994C9474547A88529DC66"
                   },
                   {
                       "path":  "autoprint\\bin\\poppler\\cairo.dll",
@@ -279,7 +279,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "AFD81EE3E16AD89E3051A8D942EB89D5C1243B3AAB6A03831884F7FD1B18508F"
+                      "sha256":  "73038E00B7C843B2A66AC4008F3D3C10FFA15A902A3978D944214AF3EBE4CC44"
                   },
                   {
                       "path":  "orders.js",
@@ -307,12 +307,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "B22B1AB9294C5DA8268CF4B9A8A7195460D5A34CB852B3B00111D5C29EB992DE"
+                      "sha256":  "7E795C3AAAF447410EBC43AE39A1E3E4414C2FCA25DC15BE8555F213F9AF7062"
                   },
                   {
                       "path":  "waves.js",
-                      "sha256":  "6652E68627A7454DC0E37C0523C85E3FE041B371289107E464943A06984C14FB"
+                      "sha256":  "01AE4FBA9FD14A572B536ADCA20109CBDF28D3E2AE33147C1DFF29DC6C789A53"
                   }
               ],
-    "signature":  "H0gnnzQSohXfS7A/a/MYZ7MAhY71dO0hHGje/K0yDjXdfKdiSsJKi+SQqK4bqHsZ1StTE+REzpA1afcZsanxDFVAiWv04v7Cxp0ZDOyGXiZjT0/r7O2jlCu+VCElgqFvyJp/Gls5lqKKufJmK4P+cgziZVWUbu0d2qTiH/GGS1bTBzATU1lnbNZepPXz8uC102fuH7rfohDXcQwh7arXGga8kql7l0lh1j9ELQSQkIG42yZemVRydk5kEDzN3d1Gr7CFMl/9U6Q8Dw9Ih6eF6xhnmXfKWHgOyjVFMAHq5ETjSdjPMelWA9ENFoGymnVyavmyTXAh0kzp5OvlB6QnhcRPpRKA5vhAT/fRaRjXD64DZFofGhcjzR4rsc21C1UvqnXHJOiC1HDAP7CpCdBmN6MWKTv6BmU0EjP5Ay3mRAQTAl6tprOLTXCQZtcXHjaO0bsLmExJ1tf9rZLNq5SVQ0G2TFFpsRYD2A4syssDnQs1QBpJAaeWe5WU3JO5HGqf"
+    "signature":  "CrSMwJIQkn8koieWSgCpgEsB1NyibbFJCf4JMXCVV1CRpX+3khZ9UM+6R7mkZx44pD5sFDwJeEUYIYI3MrSwl7fEVm3g42CXxJYAcRblZXLCE0d+j9Kjm6A/ADVAxdJicc5Gty0ex9um3NAvaaSHg04XQ10tCcOLEhVnyJ6tVaqhRXYLpFQ8E03fdUxFWriB7l0CXH7iqrl87HHJxJJqAhtqg3PeYsPMhkKMJnuEYipHEEkweZX4CSyerv7QGlQ1SDbUtUdBJVL4NeGu/UvmuUNmY7vCNKVKb/zJfHrt7Aewv/61+a3XhVo7aec2HQcpoaye57RSp76ROu5IW0w4A8DI0RrMY/jifFQoodndRkj0HS57GIKv5xMfG4yCyeaLbmSbmIXMqWmg2iB8oFLoNGjbzrl555FzxfpTX6U/Rc45se87Xsl0JLuwK5ArsqY6bglwQKldVtK6chHu4QAejAvl5GGuemDr7trOORjS17ghUd8PubLbwzF+iY8IVdI3"
 }

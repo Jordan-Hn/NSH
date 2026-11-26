@@ -103,7 +103,24 @@ function Get-PrintJob($file) {
 
     # All copies in one SumatraPDF run instead of one run per copy.
     if ($copies -gt 1) { $scale += ",$($copies)x" }
-    return [pscustomobject]@{ File = $file; Printer = $printer; Settings = $scale; Copies = $copies; Why = $why }
+    $pages = Get-PageCount $file.FullName
+    if ($pages -gt 1) { $why += ", $pages pages" }
+    return [pscustomobject]@{ File = $file; Printer = $printer; Settings = $scale; Copies = $copies; Pages = $pages; Why = $why }
+}
+
+# Page count (pdfinfo, else counted in the file), 1 if unknown. Sets how long a print may take.
+$PdfInfo = Join-Path $PSScriptRoot 'bin\poppler\pdfinfo.exe'
+function Get-PageCount($path) {
+    try {
+        if (Test-Path $PdfInfo) {
+            $line = (& $PdfInfo $path 2>$null) | Where-Object { $_ -match '^Pages:\s+(\d+)' } | Select-Object -First 1
+            if ($line -and $line -match '(\d+)\s*$') { return [int]$Matches[1] }
+        }
+        $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($path))
+        $n = [regex]::Matches($text, '/Type\s*/Page[^s]').Count
+        if ($n -gt 0) { return $n }
+    } catch {}
+    return 1
 }
 
 # Each printer prints its own files in arrival order, but the label printer and
@@ -121,6 +138,13 @@ function Start-Next($printer) {
     $Busy[$printer] = @{ Job = $job; Proc = $p; Start = Get-Date }
 }
 
+# Seconds a print may take before it's given up on: 2 minutes, or 90 s plus 60 s per page
+# printed for longer files (Door 1 can take 30-75 s a page, see TODO.md).
+function Get-PrintLimit($job) {
+    $n = [math]::Max(1, [int]$job.Pages) * [math]::Max(1, [int]$job.Copies)
+    return [math]::Max(120, 90 + 60 * $n)
+}
+
 function Check-Busy {
     foreach ($printer in @($Busy.Keys)) {
         $b = $Busy[$printer]
@@ -133,9 +157,19 @@ function Check-Busy {
                 Write-Log "  print may have failed (exit code $($b.Proc.ExitCode)); kept $($b.Job.File.FullName)"
             }
             $Busy.Remove($printer)
-        } elseif ($secs -gt 120) {
-            try { $b.Proc.Kill() } catch {}
-            Write-Log "  print took over 2 minutes; stopped it and kept $($b.Job.File.FullName)"
+        } elseif ($secs -gt (Get-PrintLimit $b.Job)) {
+            # 26/11/2026: a flat 2 minutes cut off an 8-page ticket PDF on a slow copier after one
+            # ticket, and Kill() left SumatraPDF running and the half job stuck in the queue,
+            # blocking everything after it. Now the limit grows with the pages, and a print that
+            # is given up on is ended for sure and taken out of the printer's queue.
+            try { Stop-Process -Id $b.Proc.Id -Force -ErrorAction Stop } catch {}
+            try {
+                $leaf = $b.Job.File.Name
+                PrintManagement\Get-PrintJob -PrinterName $printer -ErrorAction Stop |
+                    Where-Object { $_.DocumentName -like "*$leaf*" } |
+                    ForEach-Object { PrintManagement\Remove-PrintJob -InputObject $_ -ErrorAction SilentlyContinue }
+            } catch {}
+            Write-Log ("  print took over {0:N0}s; stopped it, cleared it from the queue and kept {1}" -f (Get-PrintLimit $b.Job), $b.Job.File.FullName)
             $Busy.Remove($printer)
         }
     }
