@@ -504,6 +504,21 @@
     const merges = [];
     let r = 1;
     const str = (ref, s, v) => '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is><t xml:space="preserve">' + xml(v) + "</t></is></c>";
+    // Stock cell as rich text (27/11/2026): "Short:" / "Check:" in colour, then each item
+    // dark, its code/name bold, so the lines are easy to read.
+    // Excel wants the run's font settings in this order: rFont, family, b, color, sz.
+    const run = (text, bold, colour) =>
+      '<r><rPr><rFont val="Calibri"/><family val="2"/>' + (bold ? "<b/>" : "") + '<color rgb="' + colour + '"/><sz val="10"/></rPr><t xml:space="preserve">' + xml(text) + "</t></r>";
+    const richStock = (ref, s, d) => {
+      const runs = [run(d.stock === "short" ? "Short: " : "Check: ", true, d.stock === "short" ? "FFB00020" : "FF8A5A00")];
+      d.stockDetail.split("\n").forEach((l, k) => {
+        const i = l.lastIndexOf(": ");
+        if (k) runs.push(run("; ", false, "FF333333"));
+        if (i > 0) runs.push(run(l.slice(0, i), true, "FF333333"), run(": " + l.slice(i + 2), false, "FF333333"));
+        else runs.push(run(l, false, "FF333333"));
+      });
+      return '<c r="' + ref + '" s="' + s + '" t="inlineStr"><is>' + runs.join("") + "</is></c>";
+    };
     const row = (cells, ht) => rows.push('<row r="' + r + '"' + (ht ? ' ht="' + ht + '" customHeight="1"' : "") + ">" + cells.join("") + "</row>");
     row([str("A" + r, 1, spec.title)], 22);
     merges.push("A" + r + ":" + last + r);
@@ -536,7 +551,8 @@
         row(
           d.cells.map((v, c) => {
             const ref = colName(c) + r;
-            if (c === stockCol) return str(ref, pageStyle(bg, d.stock === "short" ? "short" : d.stock === "check" ? "check" : d.stock === "ready" ? "ready" : "text"), d.stockDetail && d.stock !== "ready" ? d.stockDetail.replace(/\n/g, "; ") : v);
+            if (c === stockCol && d.stockDetail && d.stock !== "ready") return richStock(ref, pageStyle(bg, "text"), d);
+            if (c === stockCol) return str(ref, pageStyle(bg, d.stock === "ready" ? "ready" : "text"), v);
             if (c === dateCol && excelDate(v) != null) return '<c r="' + ref + '" s="' + pageStyle(bg, "date") + '"><v>' + excelDate(v) + "</v></c>";
             const num = String(v).replace(/,/g, "");
             if (c === numCol && /^-?\d+(\.\d+)?$/.test(num)) return '<c r="' + ref + '" s="' + pageStyle(bg, "number") + '"><v>' + Number(num) + "</v></c>";

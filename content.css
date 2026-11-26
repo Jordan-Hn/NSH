@@ -304,6 +304,8 @@ tr.nsh-group-row .nsh-group-count { font-weight: 400; color: #666; margin-left: 
   #nsh-print-sheet .nsh-print-stock-short { color: #b00020; font-weight: 600; }
   #nsh-print-sheet .nsh-print-stock-check { color: #8a5a00; font-weight: 600; }
   #nsh-print-sheet .nsh-print-stock-ready { color: #1b7f3b; }
+  #nsh-print-sheet .nsh-ps-line { color: #222; font-weight: 400; }
+  #nsh-print-sheet .nsh-ps-line b { font-weight: 700; }
   /* Tiles view prints as cards (v0.19.6) */
   #nsh-print-sheet .nsh-print-cardgroup { background: #dfe4eb; font-weight: 600; font-size: 9.5pt; padding: 4pt 6pt; margin: 8pt 0 5pt; break-after: avoid; }
   #nsh-print-sheet .nsh-print-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5pt; }
@@ -417,3 +419,6 @@ select.nsh-ship-method:focus { outline: 2px solid #607799; outline-offset: 1px; 
 .nsh-wave-panel textarea#nsh-open-input { width: 420px; max-width: calc(100% - 8px); }
 /* Ship Orders progress table: packages under the order number (26/11/2026) */
 .nsh-ship-pkgs { color: #666; font-size: 11px; white-space: nowrap; }
+
+/* Stock quantities ("need 2 · have 0") never split across lines (27/11/2026) */
+.nsh-ps-qty { white-space: nowrap; }

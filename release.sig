@@ -1,5 +1,5 @@
 {
-    "version":  "0.27.4",
+    "version":  "0.28.0",
     "files":  [
                   {
                       "path":  "autobill.js",
@@ -243,7 +243,7 @@
                   },
                   {
                       "path":  "content.css",
-                      "sha256":  "A5C02C8F37E0A2B9762425F4BB316ED3AF9B3A79D211755B58EFE96BA7293424"
+                      "sha256":  "6E94DA3CD64BA7FAFEDE399C0DD31A25461332A84842A1F0E92C83E7E0DD251D"
                   },
                   {
                       "path":  "content.js",
@@ -279,11 +279,11 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "F230BAEA3632575A885087F11B54B0D20DA22D4029F0A2D47076D5F830876B5B"
+                      "sha256":  "C30BB69845F05D369C6FC3E0C8E6FEEF29D85D075D410024328CEC90F20BBCE7"
                   },
                   {
                       "path":  "orders.js",
-                      "sha256":  "FE811FC69BF4290C80D2125F08CFF53B11027E55E4269F75902185CF715EE90B"
+                      "sha256":  "4E1098E8BD05B9EF4F8DC8E5D3E20FAD7E39DEDE67F5418E0505FBA3F3D6DF1D"
                   },
                   {
                       "path":  "print.js",
@@ -303,16 +303,16 @@
                   },
                   {
                       "path":  "stats.js",
-                      "sha256":  "28B3BFE6AE2D2E739E2DF546BA22F8902C116B11BA8CB21E26C0BB3B282B43B8"
+                      "sha256":  "E6C9DE22E7C5A926FE7145BE877265A2CA7FAD663D6F22A25D437C8237E28B6A"
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "D7121C2CF5AE88726AAE250E6AF6DBDB1AEF91A9FA8C87BC00B763EB0289843D"
+                      "sha256":  "044CDFE1234A0AB7D791987600D7E1D4A221611372DC8B724852977196BA4767"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "80BA21B08768AE4006AB4B81E5CE5D2802772921A027D7AC210E394E198DD8D0"
                   }
               ],
-    "signature":  "qUsuzpErIc1UARPA9uhCejGGPPCatPhLrvz8U5T4kF3NPS4R5g1yka1Pkb/ypiwODVvfkb+cJwMeZpxFx+fwofbN2eLR/Dc160iipWB0/D1trXvgzXkToKBrLD6MxG+Qdn8fKV+6EkprC7JPGAodaGjwO8PYA0P3QV2OLGybdYmwbj/NLX5S/CCEgCNZpiViruWziZg93u3HhNivwZ/ddvU3WfZAN8PDrFcmGaT2gp5C1+AMiTrFl08/wa9QJwVPQmcJp8U6QnutKJarQDcykUXiXRtPteRgoo4e1954kNqlNFI5DaKO4WpGe5aAeQks7DK8hzexJ8Q9LZiczx0C6T4NkRqdM93wqVxvDfzRe6GKQZyGXHbeHTJxoku33mtAEPtgaMmpR+W869Mg4zt2NWL2diijmWxmK+6pU21tBLjQT1N56s4qV3fVJ/KyBkHcusSUllnwFe/KsEHTOagugP1n+maYJuyJYo+Udue0PA0cIZTMcfxZ+WSpPRj59BU8"
+    "signature":  "ryGFiBDN0/s/rlCQUPat9E3our8GJaABuHjephrFDR/bWFv8Ep0JKRqcV0dbIId5ad06H+vY03VwxhImbi3yFqRzS3F1mZDQFbfpgI/c/pRwvP7uo1Zhapu/whLs7tQNL0XV49HCHitKZ2nrGyH0PhdF/A4xKHReG65qTsPKwnq4BegPmu1aUQ/TcRzMrxDO4JXAA+eJH6CFAbYRZXdKCWJhu3BdeKdaqKAO/EYIVsaAgdumh/mU1DEK6y9swGOahBgTXeHTVsCSkChB52I+nVA7OfGcNqPF0L3sdthBnK0YASYmHX1bcSRLMvaHybE66Ag3gVO2P/iSB4tYNjCVt5g3Rcx4vtI5ZCOsK7yRhJKFQwIudVlYldSI8D/i1zzzOCw7BC2zYUJ4OXZ3W0F+dVadnJt9I7VrfW7MeqolqRanEqBkSYF+zM2u4QAxvS+GYOeGsQ78djDSprs8HeOV6O9ZvM4k2Wxh1a15fCc5tNlkD6lHcsHiAn8MlWcxP4mn"
 }

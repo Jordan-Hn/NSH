@@ -91,7 +91,7 @@
         "salesorder",
         null,
         [any, "AND", ["mainline", "is", "F"], "AND", ["item.type", "anyof", ["InvtPart", "Assembly", "Kit"]], "AND", ["closed", "is", "F"]],
-        [col("tranid"), col("item"), col("location"), col("quantity"), col("quantitycommitted"), col("quantityshiprecv"), col("type", "item")]
+        [col("tranid"), col("item"), col("location"), col("quantity"), col("quantitycommitted"), col("quantityshiprecv"), col("type", "item"), col("displayname", "item")]
       ) || []).forEach((r) => {
         const q = Math.abs(Number(r.getValue("quantity")) || 0);
         const need = q - (Number(r.getValue("quantitycommitted")) || 0) - (Number(r.getValue("quantityshiprecv")) || 0);
@@ -99,6 +99,8 @@
           so: String(r.getValue("tranid")).toUpperCase(),
           item: r.getValue("item"),
           name: r.getText("item"),
+          // In this account the item's "display name" field holds the product code (e.g. 11GB0003).
+          code: r.getValue("displayname", "item") || "",
           loc: r.getValue("location"),
           kit: r.getValue("type", "item") === "Kit",
           need: Math.max(0, need),
@@ -131,7 +133,7 @@
       mine.forEach((l) => {
         if (l.need <= 0) return;
         if (l.kit || !l.loc) {
-          res.lines.push(l.name + ": " + l.need + " not committed (" + (l.kit ? "kit" : "no warehouse on the line") + ", check by hand)");
+          res.lines.push({ name: l.name, code: l.code, rest: l.need + " to check (" + (l.kit ? "kit" : "no warehouse") + ")" });
           if (res.state === "ready") res.state = "check";
           return;
         }
@@ -141,12 +143,50 @@
           avail[key] = left - l.need;
         } else {
           res.state = "short";
-          res.lines.push(l.name + ": needs " + l.need + ", " + left + " available");
+          res.lines.push({ name: l.name, code: l.code, rest: "need " + l.need + " · have " + left });
         }
       });
       out[r.so] = res;
     });
     return out;
+  }
+
+  // How stock items are named (27/11/2026): product code, name, or both. The Stock field
+  // next to View picks it; remembered per browser, and the Home portlet follows it too.
+  const STOCK_LABEL_KEY = "nshStockLabel";
+  const STOCK_LABELS = [
+    ["both", "Code + name"],
+    ["code", "Code"],
+    ["name", "Name"],
+  ];
+  function stockLabelNow() {
+    let v = "both";
+    try {
+      v = localStorage.getItem(STOCK_LABEL_KEY) || "both";
+    } catch (e) {}
+    return STOCK_LABELS.some((l) => l[0] === v) ? v : "both";
+  }
+  function itemLabel(l) {
+    const mode = stockLabelNow();
+    if (mode === "code" && l.code) return l.code;
+    if (mode === "both" && l.code && l.code !== l.name) return l.code + " " + l.name;
+    return l.name;
+  }
+  const lineText = (l) => itemLabel(l) + ": " + l.rest;
+
+  // Stock lines in the PDF (27/11/2026: all-red text was hard to read): only "Short:" /
+  // "Check:" keeps the colour; each item is dark text with its code/name in bold.
+  function stockHtml(r) {
+    return (
+      '<span class="nsh-ps-state">' + esc(r.stock === "short" ? "Short:" : "Check:") + "</span>" +
+      r.stockDetail
+        .split("\n")
+        .map((l) => {
+          const i = l.lastIndexOf(": ");
+          return '<div class="nsh-ps-line">' + (i > 0 ? "<b>" + esc(l.slice(0, i)) + "</b>: " + '<span class="nsh-ps-qty">' + esc(l.slice(i + 2)) + "</span>" : esc(l)) + "</div>";
+        })
+        .join("")
+    );
   }
 
   // ---------- drawing ----------
@@ -267,17 +307,20 @@
       else if (s.state === "ready") td.innerHTML = '<span class="nsh-stock-ready">Ready</span>';
       else {
         // First item, then "+N more"; the full list (needed vs available) on hover.
-        const names = s.lines.map((x) => x.split(":")[0]);
+        const names = s.lines.map(itemLabel);
+        const texts = s.lines.map(lineText);
         td.innerHTML =
-          '<span class="' + (s.state === "short" ? "nsh-stock-short" : "nsh-stock-check") + '" data-detail="' + esc(s.lines.join("\n")) + '">' +
+          '<span class="' + (s.state === "short" ? "nsh-stock-short" : "nsh-stock-check") + '" data-detail="' + esc(texts.join("\n")) + '">' +
           (s.state === "short" ? "Short: " : "Check: ") + '<span class="nsh-stock-brief">' + esc(names[0]) + (names.length > 1 ? " +" + (names.length - 1) + " more" : "") + "</span></span>" +
-          '<div class="nsh-stock-all">' + s.lines.map(esc).join("<br>") + "</div>";
+          '<div class="nsh-stock-all">' + s.lines.map((l) => esc(itemLabel(l)) + ': <span class="nsh-ps-qty">' + esc(l.rest) + "</span>").join("<br>") + "</div>";
       }
     });
 
   }
 
+  let lastStock = null;
   function draw(rows, stock) {
+    lastStock = stock;
     const t = today();
     const counts = {};
     const depts = {};
@@ -605,7 +648,7 @@
                     // Every short item in full (the PDF must hold all of it).
                     const text =
                       isStock && r.stockDetail && r.stock !== "ready"
-                        ? esc(r.stock === "short" ? "Short:" : "Check:") + "<br>" + r.stockDetail.split("\n").map(esc).join("<br>")
+                        ? stockHtml(r)
                         : esc(v);
                     return '<td class="' + (isStock ? "nsh-print-stock-" + r.stock : "") + '">' + text + "</td>";
                   })
@@ -617,8 +660,7 @@
       .join("");
     // Tiles view prints as cards (24/11/2026: the PDF follows the chosen view).
     // Every view prints the full stock list.
-    const stockText = (r, v) =>
-      r.stockDetail && r.stock !== "ready" ? esc(r.stock === "short" ? "Short:" : "Check:") + "<br>" + r.stockDetail.split("\n").map(esc).join("<br>") : esc(v);
+    const stockText = (r, v) => (r.stockDetail && r.stock !== "ready" ? stockHtml(r) : esc(v));
     const cards = () => {
       const at = (name) => snap.cols.findIndex((c) => c.name.toUpperCase() === name);
       const top = [at("DOCUMENT NUMBER"), at("SHIP DATE")].filter((i) => i >= 0);
@@ -872,6 +914,9 @@
     const input = field.querySelector("input");
     input.readOnly = true;
     input.setAttribute("aria-label", "View");
+    // The copied Style input is sized for its own short words; "Large rows" and "Code + name" got cut off (27/11/2026).
+    input.style.setProperty("width", "115px", "important");
+    setTimeout(() => input.style.setProperty("width", "115px", "important"), 1500);
     const show = () => (input.value = (LAYOUTS.find((l) => l[0] === layoutNow()) || LAYOUTS[0])[1]);
     show();
     const box = field.querySelector(".uir-select-input-container") || input;
@@ -900,6 +945,36 @@
       const panel = document.getElementById("nsh-stats-panel");
       if (panel) panel.querySelector(".uir-filters-body").appendChild(field);
     }
+    addStockLabelField(field);
+  }
+  // "Stock" field (Code + name / Code / Name): a copy of the View field just made.
+  function addStockLabelField(viewField) {
+    if (document.getElementById("nsh-stocklabel-field")) return;
+    const field = viewField.cloneNode(true);
+    field.id = "nsh-stocklabel-field";
+    field.style.marginLeft = "";
+    const label = field.querySelector(".uir-label a, .uir-label-span, .uir-label");
+    if (label) label.textContent = "Stock";
+    const input = field.querySelector("input");
+    input.setAttribute("aria-label", "Stock");
+    const show = () => (input.value = (STOCK_LABELS.find((l) => l[0] === stockLabelNow()) || STOCK_LABELS[0])[1]);
+    show();
+    const box = field.querySelector(".uir-select-input-container") || input;
+    field.querySelector(".uir-field").addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropMenu(box, STOCK_LABELS, (v) => {
+        try {
+          localStorage.setItem(STOCK_LABEL_KEY, v);
+        } catch (err) {}
+        show();
+        if (currentRows) {
+          draw(currentRows, lastStock);
+          applyFilter(currentRows, lastStock, today());
+        }
+      });
+    });
+    viewField.after(field);
   }
 
   // Helper view on/off (24/11/2026: switch between the old and new page).
