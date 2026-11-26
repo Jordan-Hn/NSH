@@ -1,5 +1,5 @@
 {
-    "version":  "0.25.9",
+    "version":  "0.26.6",
     "files":  [
                   {
                       "path":  "autobill.js",
@@ -279,7 +279,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "93E1E2E3B5624AC35D90244328C3F4332EA9FE242FC3792EDC1EA934D302085B"
+                      "sha256":  "AFD81EE3E16AD89E3051A8D942EB89D5C1243B3AAB6A03831884F7FD1B18508F"
                   },
                   {
                       "path":  "orders.js",
@@ -307,12 +307,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "B51DCA8830585E0CABBBC6FC190B134D92224482826964E933FD8CE70650A949"
+                      "sha256":  "B22B1AB9294C5DA8268CF4B9A8A7195460D5A34CB852B3B00111D5C29EB992DE"
                   },
                   {
                       "path":  "waves.js",
-                      "sha256":  "F82462DA01C159D438E6B210AF08B61ACFD99C6C680AAD62D98933DA48FBF797"
+                      "sha256":  "6652E68627A7454DC0E37C0523C85E3FE041B371289107E464943A06984C14FB"
                   }
               ],
-    "signature":  "m7NtmwduXnZDN8CMHcKR25hKYXSu/VdUUMMqHffwYXwj2jPHOJvq5x3dMPi9mN6Bg7hYx7KF+owddyXx7BDyRCNIkaztVH72pPIPSTk/GLV9WyQ77vVgqp63GIAVBdeQfogj5yPfolb9iJIrQjfdrbGKGwj42BVLse/qNWXFfJJmyOt/d16PIr+13Nr+e+pptpLe0I0rZmkBHPIHLJ72EOyM+vU9XazrgR8Zwdiw9zTGnT2be0mhhZvTaObJg9i3w1Y4VBudzEXa6z5L9LvbC7o9iNxmT0sYGC3ccr/O5lNZW0S7pntkvooF8F9fgTYa+rbIERMFmSi0Jll+VYeJaqkY6DHDO9FYX64IgvvauxSOkd1ovUvQCq6mqEn88bvrkhw2l6sNF+PmLLy7IwJkfugMiNbA0FlPAayYFj64UmyEAet3zYexLvDgin8ooCW75tQr18dP/l1nU8mavLCS0j4tMz2xL+XWqhE/HxOTAe/E0Uv2yJWG8E+A5aGTdZuz"
+    "signature":  "H0gnnzQSohXfS7A/a/MYZ7MAhY71dO0hHGje/K0yDjXdfKdiSsJKi+SQqK4bqHsZ1StTE+REzpA1afcZsanxDFVAiWv04v7Cxp0ZDOyGXiZjT0/r7O2jlCu+VCElgqFvyJp/Gls5lqKKufJmK4P+cgziZVWUbu0d2qTiH/GGS1bTBzATU1lnbNZepPXz8uC102fuH7rfohDXcQwh7arXGga8kql7l0lh1j9ELQSQkIG42yZemVRydk5kEDzN3d1Gr7CFMl/9U6Q8Dw9Ih6eF6xhnmXfKWHgOyjVFMAHq5ETjSdjPMelWA9ENFoGymnVyavmyTXAh0kzp5OvlB6QnhcRPpRKA5vhAT/fRaRjXD64DZFofGhcjzR4rsc21C1UvqnXHJOiC1HDAP7CpCdBmN6MWKTv6BmU0EjP5Ay3mRAQTAl6tprOLTXCQZtcXHjaO0bsLmExJ1tf9rZLNq5SVQ0G2TFFpsRYD2A4syssDnQs1QBpJAaeWe5WU3JO5HGqf"
 }

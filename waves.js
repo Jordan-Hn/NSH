@@ -30,6 +30,11 @@
   const NOT_LISTED = "Not on Wave Criteria at its warehouse. Usually no stock committed yet, or it's closed.";
   const ACTIVE = ["claimed", "ready", "saving"];
   const FINAL = ["done", "skipped"];
+  // Since 26/11/2026 the work runs in hidden frames on the Wave Criteria page (like Ship
+  // Orders), so the page with the panel never moves. Each frame is one worker; the steps,
+  // the shared run, the lock and the save order are the same as when they were tabs.
+  const IN_FRAME = window.top !== window;
+  const FRAME_TAG = "nshwave:";
 
   // ---------- storage ----------
 
@@ -44,14 +49,21 @@
     if (job) localStorage.setItem(JOB_KEY, JSON.stringify(job));
     else localStorage.removeItem(JOB_KEY);
   }
+  // A frame keeps its part in its own window.name (it survives the frame's page loads);
+  // sessionStorage is shared by every frame in the tab, so it can't be used there.
   function readSess() {
     try {
+      if (IN_FRAME) return window.name.startsWith(FRAME_TAG) ? JSON.parse(window.name.slice(FRAME_TAG.length)) : null;
       return JSON.parse(sessionStorage.getItem(TAB_KEY)) || null;
     } catch (e) {
       return null;
     }
   }
   function writeSess(s) {
+    if (IN_FRAME) {
+      window.name = s ? FRAME_TAG + JSON.stringify(s) : "";
+      return;
+    }
     if (s) sessionStorage.setItem(TAB_KEY, JSON.stringify(s));
     else sessionStorage.removeItem(TAB_KEY);
   }
@@ -189,6 +201,30 @@
     return { good, bad, all, dupes };
   }
 
+  // Store POs (26/11/2026): a Givex PO number (9 digits starting 7 or 8) is swapped for
+  // its TO, the transfer order whose memo starts "Givex Purchase Order <n>" (some have a
+  // word after), so the list keeps its order and wave numbers still line up with the rows.
+  // Returns { text, found: { po: to }, missing: [po] }, or null if NetSuite can't be asked.
+  function posToTOs(text) {
+    const pos = [...new Set(String(text).split(/[\s,;]+/).filter((t) => /^[78]\d{8}$/.test(t)))];
+    const found = {};
+    if (!pos.length) return { text, found, missing: [] };
+    if (typeof window.nlapiSearchRecord !== "function") return null;
+    for (let i = 0; i < pos.length; i += 40) {
+      const any = [];
+      pos.slice(i, i + 40).forEach((n, j) => {
+        if (j) any.push("OR");
+        any.push(["memo", "startswith", "Givex Purchase Order " + n]);
+      });
+      (window.nlapiSearchRecord("transferorder", null, [any, "AND", ["mainline", "is", "T"], "AND", ["trandate", "onorafter", "daysago730"]], [new window.nlobjSearchColumn("tranid"), new window.nlobjSearchColumn("memo")]) || []).forEach((r) => {
+        const n = (String(r.getValue("memo")).match(/Givex Purchase Order\s+(\d{9})\b/i) || [])[1];
+        if (n && pos.includes(n) && !found[n]) found[n] = String(r.getValue("tranid")).toUpperCase();
+      });
+    }
+    const swapped = String(text).replace(/(^|[\s,;])([78]\d{8})(?=$|[\s,;])/g, (m, pre, n) => pre + (found[n] || n));
+    return { text: swapped, found, missing: pos.filter((n) => !found[n]) };
+  }
+
   // known = { order: ["50009"] }: waves each order already had at Check List.
   // skip = the same shape, for orders the user chose not to wave again.
   function buildJob(parsed, tn, ids, skip, known) {
@@ -301,23 +337,47 @@
     return count >= 10 ? 2 : count >= 3 ? 1 : 0;
   }
 
-  // Must be called straight from a click. Browsers allow one pop-up per click,
-  // so a second helper only opens if pop-ups are allowed for NetSuite.
+  // Workers are hidden frames on this page (no pop-ups, the page never moves). Each loads
+  // Wave Criteria with #nshframe, joins the run and works through it like a tab did.
   function openHelpers(n) {
-    let opened = 0;
     for (let k = 0; k < n; k++) {
-      // Unique window name each time so the browser opens a new tab, never reuses one.
-      const w = window.open(CRITERIA_PATH + "#nshhelp", "nshHelper" + Date.now() + k);
-      if (w) opened++;
+      const f = document.createElement("iframe");
+      f.className = "nsh-wave-frame";
+      f.style.cssText = "position:fixed;left:0;top:0;width:1280px;height:900px;border:0;opacity:0;pointer-events:none;z-index:-1";
+      f.src = CRITERIA_PATH + "#nshframe";
+      document.body.appendChild(f);
     }
-    return { wanted: n, opened };
+    watchFrames();
+    return { wanted: n, opened: n };
   }
+  // While frames work: warn before leaving the page, and take them away once nothing is
+  // being worked on (never in the middle of a save).
+  let frameWatch = null;
+  function watchFrames() {
+    window.onbeforeunload = () => "Waves are still being created.";
+    clearInterval(frameWatch);
+    frameWatch = setInterval(() => {
+      const job = readJob();
+      const busy = job && job.items.some((x) => ACTIVE.includes(x.state));
+      if (busy || (job && !job.stopped && !isFinished(job))) return;
+      clearInterval(frameWatch);
+      document.querySelectorAll("iframe.nsh-wave-frame").forEach((f) => f.remove());
+      window.onbeforeunload = null;
+      renderPanel();
+    }, 2000);
+  }
+  const workingHere = () => !!document.querySelector("iframe.nsh-wave-frame");
 
   // Helpers close themselves when there's nothing left. The browser can refuse
   // for a moment (e.g. while another tab shows a pop-up), so try a few times.
   // The end-of-run pop-up is left to the main tab.
   function closeHelperTab() {
     allowLeave();
+    if (IN_FRAME) {
+      writeSess(null);
+      location.replace("about:blank");
+      return;
+    }
     [0, 1000, 3000, 6000].forEach((ms) =>
       setTimeout(() => {
         allowLeave();
@@ -543,6 +603,7 @@
   // ---------- floating bar ----------
 
   function progressBar(s, status) {
+    if (IN_FRAME) return; // the panel on the page shows progress
     let bar = document.getElementById("nsh-wave-bar");
     if (!bar) {
       bar = document.createElement("div");
@@ -968,6 +1029,7 @@
 
   // quiet = don't show the end-of-run pop-up (helper tabs).
   async function renderPanel(quiet) {
+    if (IN_FRAME) return;
     const panel = getPanel();
     let job = readJob();
     if (job && !job.stopped && !isFinished(job)) {
@@ -1000,7 +1062,7 @@
       panel,
       "Bulk Waves",
       '<label class="nsh-label" for="nsh-wave-input">TO or SO numbers</label>' +
-        '<textarea id="nsh-wave-input" rows="6" placeholder="TO12345&#10;TO12346&#10;SO123456"></textarea>' +
+        '<textarea id="nsh-wave-input" rows="6" placeholder="TO12345&#10;SO123456&#10;800012345"></textarea>' +
         '<p class="nsh-wave-hint">One per line. Each gets its own wave (at its own warehouse, Multiple Orders), numbered in list order.</p>' +
         '<div class="nsh-wave-actions"><button type="button" id="nsh-wave-check">Check List</button></div>' +
         '<div id="nsh-wave-confirm"></div>'
@@ -1008,9 +1070,21 @@
     const ta = panel.querySelector("#nsh-wave-input");
     panel.querySelector("#nsh-wave-check").onclick = (e) => {
       const box = panel.querySelector("#nsh-wave-confirm");
-      const parsed = parseOrders(ta.value);
+      let conv = null;
+      try {
+        conv = posToTOs(ta.value);
+      } catch (err) {}
+      if (!conv) {
+        alert("Bulk waves: couldn't look the store POs up in NetSuite. Refresh the page and try again.");
+        return;
+      }
+      const parsed = parseOrders(conv.text);
+      const poOf = {}; // TO -> the store PO it was found from
+      Object.keys(conv.found).forEach((po) => (poOf[conv.found[po]] = po));
+      // POs with no TO are listed as such, not as "not a TO or SO number".
+      parsed.bad = parsed.bad.filter((t) => !conv.missing.includes(t));
       if (!parsed.good.length) {
-        box.innerHTML = '<p class="nsh-wave-warn">No TO or SO numbers found.</p>';
+        box.innerHTML = '<p class="nsh-wave-warn">No TO or SO numbers found' + (conv.missing.length ? " (no TO found for " + conv.missing.map(esc).join(", ") + ")" : "") + ".</p>";
         return;
       }
       e.target.disabled = true;
@@ -1044,6 +1118,7 @@
         }
         if (missing.length) warnings.push("Not found in NetSuite (will be skipped):\n  " + missing.join("\n  "));
         if (parsed.bad.length) warnings.push("Not a TO or SO number (ignored):\n  " + parsed.bad.join("\n  "));
+        if (conv.missing.length) warnings.push("Store PO with no TO in NetSuite (skipped):\n  " + conv.missing.join("\n  "));
         // Stock split between two warehouses (e.g. KBH and Online): only the KBH part gets waved.
         const loc = found.loc || {};
         const mixed = toWave.filter((o) => loc[o] && loc[o].mixed);
@@ -1067,8 +1142,9 @@
         box.innerHTML =
           (toWave.length
             ? "<p><b>" + toWave.length + " wave" + (toWave.length > 1 ? "s" : "") + " will be created, in this order:</b> " +
-              toWave.map(esc).join(", ") + "</p>"
+              toWave.map((o) => esc(o) + (poOf[o] ? " (PO " + esc(poOf[o]) + ")" : "")).join(", ") + "</p>"
             : '<p class="nsh-wave-warn">None of these can be waved.</p>') +
+          (conv.missing.length ? '<p class="nsh-wave-warn">No TO in NetSuite for PO ' + conv.missing.map(esc).join(", ") + "</p>" : "") +
           (elsewhere.length
             ? '<p class="nsh-wave-hint">Waved at their own warehouse: ' + elsewhere.map((o) => esc(o) + " (" + esc(loc[o].name) + ")").join(", ") + "</p>"
             : "") +
@@ -1082,13 +1158,7 @@
           (toWave.length
             ? '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-wave-autoprint"> Send the picking tickets to AutoPrint when the waves are done</label>' +
               '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-wave-go">Create ' +
-              toWave.length + " Wave" + (toWave.length > 1 ? "s" : "") + "</button></div>" +
-              '<p class="nsh-wave-hint">' +
-              (helpersFor(toWave.length)
-                ? "Opens " + helpersFor(toWave.length) + " helper tab" + (helpersFor(toWave.length) > 1 ? "s" : "") +
-                  " to go faster. They close themselves when it's done. Waves still save in list order."
-                : "Runs in this tab.") +
-              "</p>"
+              toWave.length + " Wave" + (toWave.length > 1 ? "s" : "") + "</button></div>"
             : "");
         const go = box.querySelector("#nsh-wave-go");
         if (go) {
@@ -1099,10 +1169,6 @@
               return renderPanel();
             }
             go.disabled = true;
-            // Open helper tabs now, while the click still allows pop-ups.
-            // They wait for the run to appear, then join it.
-            const helpers = openHelpers(helpersFor(toWave.length));
-            if (helpers.opened < helpers.wanted) sessionStorage.setItem("nshWavesPopupNote", "1");
             const started = await updateJob((cur) => {
               if (cur && !cur.stopped && !isFinished(cur)) return false;
               const autoPrint = !!(box.querySelector("#nsh-wave-autoprint") || {}).checked;
@@ -1113,10 +1179,9 @@
               alert("Another bulk wave run is still going. Stop it or wait for it to finish first.");
               return renderPanel();
             }
-            const s = { job: readJob().id, tab: newTabId(), order: null, mode: null, stage: null };
-            await holdTabLock(s.tab);
-            writeSess(s);
-            stepCriteria(s);
+            // The frames join the run that was just saved; this page only shows progress.
+            openHelpers(1 + helpersFor(toWave.length));
+            renderPanel();
           };
         }
       }, 30);
@@ -1124,6 +1189,11 @@
   }
 
   async function joinRun(helper) {
+    if (!helper && !IN_FRAME) {
+      // From the panel (Help With This Run / Resume): one more frame does the work.
+      openHelpers(1);
+      return renderPanel();
+    }
     const job = readJob();
     if (!job || job.stopped || isFinished(job)) return helper ? closeHelperTab() : renderPanel();
     const s = { job: job.id, tab: newTabId(), order: null, mode: null, stage: null, helper: !!helper };
@@ -1137,13 +1207,14 @@
     fill(
       panel,
       "Bulk Waves: Running",
-      "<p>" + doneCount(job) + " of " + job.items.length + " done. Another tab is working on it.</p>" +
+      "<p>" + doneCount(job) + " of " + job.items.length + " done." + (workingHere() ? "" : " Another tab is working on it.") + "</p>" +
         '<div class="nsh-wave-actions">' +
-        '<button type="button" class="nsh-primary" id="nsh-wave-join">Help With This Run</button>' +
-        '<button type="button" id="nsh-wave-stopall">Stop All</button></div>' +
+        (workingHere() ? "" : '<button type="button" class="nsh-primary" id="nsh-wave-join">Help With This Run</button>') +
+        '<button type="button" id="nsh-wave-stopall">' + (workingHere() ? "Stop" : "Stop All") + "</button></div>" +
         resultsTable(job)
     );
-    panel.querySelector("#nsh-wave-join").onclick = () => joinRun(false);
+    const join = panel.querySelector("#nsh-wave-join");
+    if (join) join.onclick = () => joinRun(false);
     panel.querySelector("#nsh-wave-stopall").onclick = () =>
       updateJob((j) => {
         if (j) {
@@ -1349,8 +1420,6 @@
     const resume = panel.querySelector("#nsh-wave-resume");
     if (resume) {
       resume.onclick = async () => {
-        const helpers = openHelpers(helpersFor(remaining));
-        if (helpers.opened < helpers.wanted) sessionStorage.setItem("nshWavesPopupNote", "1");
         await updateJob((j) => {
           if (!j) return;
           j.stopped = false;
@@ -1365,7 +1434,8 @@
             }
           });
         });
-        joinRun(false);
+        openHelpers(1 + helpersFor(remaining));
+        renderPanel();
       };
     }
   }
@@ -1394,7 +1464,7 @@
     // A helper tab is opened from a working tab, and the browser copies that
     // tab's sessionStorage into it. Throw the copy away: a helper must never
     // carry on as the tab that opened it (that caused a doubled wave).
-    const isHelperLoad = onCriteria && location.hash === "#nshhelp";
+    const isHelperLoad = onCriteria && (location.hash === "#nshhelp" || (IN_FRAME && location.hash === "#nshframe"));
     if (isHelperLoad) {
       writeSess(null);
       sessionStorage.removeItem("nshWavesPopupNote");
@@ -1422,7 +1492,9 @@
         return j && !j.stopped && !isFinished(j) ? j : null;
       }, 10000);
       if (running) return joinRun(true);
+      if (IN_FRAME) return closeHelperTab();
     }
+    if (IN_FRAME && !s) return; // a frame that isn't one of ours, or has finished
 
     if (s && s.order) {
       if (s.stage === "saving") {
