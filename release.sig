@@ -1,5 +1,5 @@
 {
-    "version":  "0.28.6",
+    "version":  "0.29.2",
     "files":  [
                   {
                       "path":  "autobill.js",
@@ -235,7 +235,7 @@
                   },
                   {
                       "path":  "background.js",
-                      "sha256":  "E2F0C9CD44A44EA10B74D46981854983D3C415742431CB54E24D7D21E20662E7"
+                      "sha256":  "629BAE457C9B506617178CE81937F52946A5E74F80DD522F88928DD3BECE9E3D"
                   },
                   {
                       "path":  "bulkopen.js",
@@ -279,7 +279,7 @@
                   },
                   {
                       "path":  "manifest.json",
-                      "sha256":  "8973A62D5B3660E3503AA567121871B87187C73526C9E0143CCBADAF83A1E3C5"
+                      "sha256":  "8C4CD278F8CA2F3D2AD2649B00BCB128E06DDE2F3CC1253B11BA0FFA41BE6F9B"
                   },
                   {
                       "path":  "orders.js",
@@ -291,7 +291,7 @@
                   },
                   {
                       "path":  "ship.js",
-                      "sha256":  "17A62BB48434C0E4C9E28EC62A9EEFB42CC6BB3B524087F3DA616E7737D1E5F0"
+                      "sha256":  "1964B37F37EC9F6BB42511C039A923C1049EE9BEC7E78B318368458DA1921CFD"
                   },
                   {
                       "path":  "slip.html",
@@ -299,7 +299,7 @@
                   },
                   {
                       "path":  "slip.js",
-                      "sha256":  "36D0C0026D3A6017904766681C3263F12F69A6C9E1CB28B2AB78FD77241121E2"
+                      "sha256":  "A2CD83AED38A0364EF153315E063576EF5E6DAB3A0B0AB16440F0FA6A3CF8F25"
                   },
                   {
                       "path":  "stats.js",
@@ -307,12 +307,12 @@
                   },
                   {
                       "path":  "VERSION.txt",
-                      "sha256":  "0B32021929616337590CB2E8EF11F9541CAB36BF5E4D8935BB9C43DF5D2297C7"
+                      "sha256":  "23579D9EE46C94C51E65224C6FFF50D101A18959DB8A74967FF074CF7CCA4CF6"
                   },
                   {
                       "path":  "waves.js",
                       "sha256":  "62A1A7A4BA190D8DCE756E4623CA4A4D89D2657E32891AEF907C70D00ADDE355"
                   }
               ],
-    "signature":  "Sp/COU2dWnNn1Gjq6p+m+p4P6+yR2dLlNK06/wxspOuMzaQyZ38EO9W+j+21WTVL3y6FTeuHzbxiT8zBxJNZHKJWmhzyajJBO1MIm50qaLCdKEl7ysCLGsw/ZfKH1GH3yJqjVr3nPOVY9Qk7JJvyRvYO+BlbemyIyKHVe9aSVRR+sp1PLDoT8w99r/l0vyYJoL6+sAw8P7M6iEDWivfEn4nfsTq8eHkVsBDeoAQUzmbBR6KDpJnfsWvJg/7Ou9l3icD2UBwI1NjApZPk3V0/SHbS/25c51fFCcVaWtw/EwTWtBQGVCaDfubNt7vC/NL5tiX6+Dbo0ZrhTSSFVq9XcobSph14gqZ8+7YwUSCu5n/9zgfYbI+BdiQ3dxc8VoNj3XaZSTCz3ppHH0Bg6R2uyqJZnTBGtLbJ2DmiFfDGFDzXrcmoCUzqB1GymiU1MeJ9rCHbpQJRBx9/5xGnjiBOSCu2zFOZ/myeYWme2qSCQGdShAiUatO9oL2oWsF8gm0i"
+    "signature":  "c5lEM0MimvxkxPT+JpNumU5ZB3YXirFuwHd8nrF0Gqqc0wRN0yV/a00z5g6WJbi1VSixCBn7eVKqpit0umnCZsUOooU4zV3eHa4hgYED0GGA2WCfC39sPzrgN2URYCq4GXGy5b+ehOPwkr+67kSbMan6cQfLYjZZ6mM9QCrRZ8dCuf7ojr+1BvuY9LRyq7vumrBvVKYpd3gIt1O9zcebr2KtKEjQKB/K3Cyt//5u3SxbClr8OyzYtNy3fkAv0xDBfPWSAPR8dMDaQx7PYway4YQ+X/RnDtR4CmrEgOUcSpljC9fyeaXhCgv9PHxar5GipC4ayCBIiyuQhaFiAbTveKRPJ7ZYGjzAYt5zSyhFNuSbzL3PnH/5wISrSnqhSKVN83K2xEElDgQlPOY6k9SGQ/qTn47T1gUXkuT7pYBnQQX+E9FlsErGH73rCWrAvg8UuzkBT8odILU3qvO1PEo4MxRz2hnA8e8y72Ka07qy5VxfgTzwwy4WzzZ2SaJC/ycH"
 }

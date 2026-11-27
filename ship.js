@@ -42,6 +42,15 @@
   // Manual print (26/11/2026): "0" = don't send paperwork to AutoPrint; it's put into two
   // PDFs at the end instead (labels; invoices and packing slips), in pasted order.
   const AP_KEY = "nshShipAutoPrint";
+  // Store orders' packing slips (27/11/2026): tick box, remembered; "0" = don't print them.
+  const TO_SLIP_KEY = "nshShipToSlips";
+  const toSlipsOn = () => {
+    try {
+      return localStorage.getItem(TO_SLIP_KEY) !== "0";
+    } catch (e) {
+      return true;
+    }
+  };
   const autoPrintOn = () => {
     try {
       return localStorage.getItem(AP_KEY) !== "0";
@@ -950,18 +959,49 @@
     }
     // NetSuite decides, not the page address: after Save the saved fulfilment can
     // show at the edit address (that wrongly failed 6 good saves, 23/11/2026).
-    const fw = getFrame(slot).contentWindow;
-    let shipped = false;
-    for (let i = 0; i < 5 && !shipped; i++) {
-      shipped = lookupField("itemfulfillment", ifId, "statusref") === "shipped";
-      if (!shipped) await sleep(1500);
+    // 27/11/2026: three good-looking saves weren't saved (done by hand after). With several
+    // orders and billing tabs going at once NetSuite can be slow, so wait up to ~20 s, and if
+    // the frame is still sitting on the edit form, press Save once more (safe: it isn't
+    // shipped yet). If it still fails, say what the page shows instead of a bare "didn't save".
+    const isShipped = async (tries) => {
+      for (let i = 0; i < tries; i++) {
+        try {
+          if (lookupField("itemfulfillment", ifId, "statusref") === "shipped") return true;
+        } catch (e) {}
+        await sleep(2000);
+      }
+      return false;
+    };
+    let shipped = await isShipped(10);
+    let fw = getFrame(slot).contentWindow;
+    const stillEditing = (win) => {
+      try {
+        return !!(win.document.getElementById("btn_multibutton_submitter") || win.document.getElementById("submitter"));
+      } catch (e) {
+        return false;
+      }
+    };
+    if (!shipped && stillEditing(fw) && !pageMessages(fw).length && !said.length) {
+      const again = nextLoad(120000, "the saved item fulfilment", slot);
+      again.catch(() => {});
+      (fw.document.getElementById("btn_multibutton_submitter") || fw.document.getElementById("submitter")).click();
+      try {
+        await again;
+      } catch (e) {}
+      shipped = await isShipped(10);
+      fw = getFrame(slot).contentWindow;
     }
     if (!shipped) {
       let msg = "";
       try {
         msg = said.concat(pageMessages(fw)).join(" ");
+        if (!msg) {
+          const err = fw.document.querySelector(".uir-page-error, #div__alert, [role=alert], .uir-error-page");
+          if (err && err.innerText.trim()) msg = err.innerText.replace(/\s+/g, " ").trim().slice(0, 200);
+        }
       } catch (e) {}
-      throw step(where, reason(msg) || "the item fulfilment didn't save");
+      const page = stillEditing(fw) ? " (NetSuite stayed on the edit page after Save)" : "";
+      throw step(where, (reason(msg) || "the item fulfilment didn't save") + page);
     }
   }
 
@@ -1138,7 +1178,7 @@
 
     // Store orders (TOs): packing slip after the labels, and that's it: never billed.
     if (p.row.isTO) {
-      if (!d.paper) {
+      if (!d.paper && !p.noToSlip) {
         say("Getting the packing slip...");
         queuePrint(p, { bytes: await tidySlip(await fetchPdf(packingSlipUrl(p.rec.id, ifId, "TrnfrOrd"))), name: "PackingSlip_" + p.row.so + ".pdf" });
         d.paper = true;
@@ -1623,6 +1663,9 @@
       (toShip.length
         ? '<label class="nsh-print-stamp" id="nsh-ship-dry-row"' + (dryShown() ? "" : ' style="display:none"') + '><input type="checkbox" id="nsh-ship-dry"' + (localStorage.getItem(DRY_KEY) === "1" ? " checked disabled" : "") + "> Dry run (fill each order in, don't save anything)</label>" +
           '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-ship-autoprint"' + (autoPrintOn() ? " checked" : "") + "> Send paperwork to AutoPrint</label>" +
+          (toShip.some((p) => p.row.isTO && !p.push)
+            ? '<label class="nsh-print-stamp"><input type="checkbox" id="nsh-ship-toslips"' + (toSlipsOn() ? " checked" : "") + "> Print packing slips for store orders</label>"
+            : "") +
           '<div class="nsh-wave-actions"><button type="button" class="nsh-primary" id="nsh-ship-go">' + (toShip.every((p) => p.row.isTO) ? "Ship " : "Ship and Bill ") + toShip.length + " Order" + (toShip.length > 1 ? "s" : "") + "</button></div>"
         : '<p class="nsh-wave-warn">Nothing to ship in this list.</p>');
     const msgs = [];
@@ -1670,6 +1713,13 @@
           if (p) p.skipLabels = !cb.checked;
         });
         // A hidden Dry run box never counts (it can't be seen, so it can't be meant).
+        const slipBox = box.querySelector("#nsh-ship-toslips");
+        if (slipBox) {
+          try {
+            localStorage.setItem(TO_SLIP_KEY, slipBox.checked ? "1" : "0");
+          } catch (e) {}
+          plans.forEach((x) => x.row.isTO && (x.noToSlip = !slipBox.checked));
+        }
         const apBox = box.querySelector("#nsh-ship-autoprint");
         if (apBox)
           try {
@@ -1845,6 +1895,22 @@
       todo.slice(nextTodo).forEach((k) => {
         Object.assign(work[k], { result: "failed", finished: true, note: "Not started: NetSuite's usage limit was hit. Use Retry Failed." });
       });
+    // A save NetSuite didn't take gets one more go by itself, one order at a time, before
+    // the run ends (27/11/2026). Finished steps aren't repeated (p.done), and its paperwork
+    // prints once it's through.
+    if (!limitHit && !dry) {
+      const again = todo.filter((k) => work[k].result === "failed" && /didn't save/.test(work[k].note || ""));
+      for (const k of again) {
+        work[k].note = "Trying again...";
+        draw(title());
+        await oneOrder(work[k], 0);
+        if (work[k].result !== "failed") {
+          work[k].note += " (worked on the second try)";
+          draw(title());
+        }
+        flushPrints(work, draw, title, send);
+      }
+    }
     await flushPrints(work, draw, title, send);
     // Every finished order's paperwork in pasted order (earlier runs of this job too, so
     // the PDFs after a Retry Failed hold the whole list). Offered with AutoPrint on as well.
@@ -1949,6 +2015,8 @@
           fresh.forEach((x) => {
             if (x.action === "ship" && leftOut.has(x.row.so)) Object.assign(x, { action: "skip", why: "Left out of this run" });
           });
+          // So does the store-order packing slip choice.
+          fresh.forEach((x) => x.row.isTO && (x.noToSlip = !toSlipsOn()));
           // Methods picked in the dropdown before the dry run carry over too.
           plans.filter((x) => x.methodChosen).forEach((old) => {
             const x = fresh.find((f) => f.row.so === old.row.so && f.action === "ship" && !f.push);

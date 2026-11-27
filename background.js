@@ -359,6 +359,7 @@ async function slipEntry(hash) {
   const bar = hash.indexOf("|");
   const key = bar >= 0 ? hash.slice(0, bar) : hash;
   if (slipCache.has(key)) return slipCache.get(key);
+  if (pendingSlips.has(key)) return pendingSlips.get(key);
   const original = bar >= 0 ? decodeURIComponent(hash.slice(bar + 1)) : "";
   if (!isPackingSlip(original)) return null;
   const b64 = await tidiedPackingSlipB64({ url: original });
@@ -367,6 +368,32 @@ async function slipEntry(hash) {
   rememberSlip(key, entry);
   return entry;
 }
+// 27/11/2026: catch the slip as it starts loading, before NetSuite's untidied copy shows
+// (it could be seen snapping over, and a quick Ctrl+P would print the untidied one). The tab goes
+// straight to slip.html, which waits for the tidied copy fetched here through another
+// NetSuite tab; if tidying fails, slip.js shows NetSuite's original instead.
+const pendingSlips = new Map(); // key -> Promise of { b64, name } | null
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (pluginOff) return;
+  const url = info.url || tab.url;
+  if (info.status !== "loading" || !url || !isPackingSlip(url) || /#nsh-original$/.test(url)) return;
+  const seen = tabId + "|" + url;
+  if (slipSwapped.has(seen)) return;
+  if ((await netsuiteTabFor(tab)) == null) return; // no NetSuite tab to fetch through: the old way (after load) handles it
+  slipSwapped.add(seen);
+  const key = Date.now().toString(36) + tabId;
+  const name = /pickingticket/i.test(url) ? "PickingTicket.pdf" : "PackingSlip.pdf";
+  pendingSlips.set(
+    key,
+    tidiedPackingSlipB64({ url, openerTabId: tab.openerTabId, windowId: tab.windowId })
+      .then((b64) => (b64 ? (rememberSlip(key, { b64, name }), { b64, name }) : null))
+      .catch(() => null)
+      .finally(() => setTimeout(() => pendingSlips.delete(key), 60000))
+  );
+  try {
+    await chrome.tabs.update(tabId, { url: VIEWER + "#" + key + "|" + encodeURIComponent(url) });
+  } catch (e) {}
+});
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (pluginOff) return;
   if (info.status !== "complete" || !tab.url || !isPackingSlip(tab.url) || /#nsh-original$/.test(tab.url)) return;
@@ -391,13 +418,27 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true;
 });
 
+// The tidied slip opens as a PDF tab of its own (blob: address); remember which slip each
+// one is, so the Auto Print button can print it (27/11/2026).
+const BLOB_PREFIX = "blob:" + chrome.runtime.getURL("");
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || msg.type !== "nsh-slip-blob" || !sender.url || !sender.url.startsWith(VIEWER)) return;
+  if (typeof msg.url === "string" && msg.url.startsWith(BLOB_PREFIX)) chrome.storage.session.set({ ["slipblob:" + msg.url]: String(msg.hash || "") });
+  reply({ ok: true });
+});
+async function slipHashFor(url) {
+  if (url.startsWith(VIEWER)) return new URL(url).hash.slice(1);
+  if (url.startsWith(BLOB_PREFIX)) return (await chrome.storage.session.get("slipblob:" + url))["slipblob:" + url] || null;
+  return null;
+}
 chrome.action.onClicked.addListener(async (tab) => {
   if (pluginOff) return flash(tab.id, "OFF", "#777777");
-  // The tidied packing slip viewer: print the tidied copy it shows.
-  if (tab.url && tab.url.startsWith(VIEWER)) {
+  // The tidied packing slip / picking ticket (its viewer page, or the PDF tab it opens as).
+  if (tab.url && (tab.url.startsWith(VIEWER) || tab.url.startsWith(BLOB_PREFIX))) {
     checkHelper();
     try {
-      const entry = await slipEntry(new URL(tab.url).hash.slice(1));
+      const hash = await slipHashFor(tab.url);
+      const entry = hash && (await slipEntry(hash));
       if (!entry) throw new Error("slip not found");
       await chrome.downloads.download({ url: "data:application/pdf;base64," + entry.b64, filename: safeName(entry.name), saveAs: false, conflictAction: "uniquify" });
       flash(tab.id, "OK", "#1b7f3b");
