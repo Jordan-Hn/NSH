@@ -145,6 +145,8 @@
     if (SET.copyAll !== false) {
       document.querySelectorAll('.uir-field-wrapper[data-mode="view"] .uir-field').forEach((el) => {
         if (el.querySelector("input, select, textarea, img, .checkbox, .uir-field-checkbox")) return;
+        // Values that are links (wave, Created From, customer...) stay links (27/11/2026).
+        if (el.querySelector("a[href]") || el.closest("a[href]")) return;
         if (el.textContent.replace(/ /g, " ").trim()) makeCopyable(el);
       });
       return;
