@@ -11,6 +11,18 @@
   try {
     if (localStorage.getItem("nshOff") === "1") return;
   } catch (e) {}
+  // This browser's Settings (copied into the page by content.js, 27/11/2026). Anything not
+  // set falls back to how the tool worked before there were settings.
+  const SET = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+  const setting = (k, d) => (SET[k] === undefined ? d : SET[k]);
+  const toolOff = (k) => !!(SET.tools && SET.tools[k] === false);
+  if (toolOff("bulkOpen")) return;
 
   if (!/Transaction_TYPE=ItemShip/i.test(location.search) || /searchid=|style=|\bresults?\b/i.test(location.search)) return;
 

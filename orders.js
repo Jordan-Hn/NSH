@@ -26,6 +26,17 @@
   try {
     if (localStorage.getItem("nshOff") === "1") return;
   } catch (e) {}
+  // This browser's Settings (copied into the page by content.js, 27/11/2026). Anything not
+  // set falls back to how the tool worked before there were settings.
+  const SET = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+  const setting = (k, d) => (SET[k] === undefined ? d : SET[k]);
+  const toolOff = (k) => !!(SET.tools && SET.tools[k] === false);
 
   // Loads on the Pending Orders page and only lends window.__nshOrderExport (no panel).
   // Also on a sales order / transfer order page (view, not edit): a "Copy Tracker Row" button
@@ -737,7 +748,7 @@
       }
     });    cell.after(mine);
   }
-  if (ON_RECORD && !window.__nshOrdersTest) setTimeout(addCopyRowButton, 600);
+  if (ON_RECORD && !window.__nshOrdersTest && !toolOff("copyRow")) setTimeout(addCopyRowButton, 600);
   if (window.__nshOrdersTest) {
     Object.assign(window.__nshOrdersTest, { parseOrders, courierOf, pltCtn, cwsRows, retailRows, excelDate, stateCode, colName, sheetXml, crc32, excel, CWS_COLS, CWS_WIDTHS, RETAIL_COLS, RETAIL_WIDTHS, pageWorkbook });
   }

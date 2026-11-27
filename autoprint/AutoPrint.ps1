@@ -14,6 +14,9 @@ $Settings = @{
     LabelMaxPts   = '700'          # longest page side under this (points) = label. A4 is 842, a 4x6" label 432.
     PalletPattern = '(?i)\bPallet\b'
     PalletCopies  = '2'
+    LabelCopies   = '1'            # copies of other labels (27/11/2026: set from the Settings page)
+    InvoiceCopies = '1'            # copies of invoices
+    PageCopies    = '1'            # copies of other full pages (packing slips, picking tickets)
     PollSeconds   = '1'
     WatchFolder   = ''             # blank = Downloads\AutoPrint
     UpdateRepo    = ''             # owner/name on GitHub; blank = no automatic updates
@@ -34,6 +37,9 @@ $PagePrinter   = $Settings.PagePrinter
 $LabelMaxPts   = [double]$Settings.LabelMaxPts
 $PalletPattern = $Settings.PalletPattern
 $PalletCopies  = [int]$Settings.PalletCopies
+$LabelCopies   = [math]::Max(1, [int]$Settings.LabelCopies)
+$InvoiceCopies = [math]::Max(1, [int]$Settings.InvoiceCopies)
+$PageCopies    = [math]::Max(1, [int]$Settings.PageCopies)
 $PollSeconds   = [double]$Settings.PollSeconds
 $UpdateMinutes = [math]::Max(5, [double]$Settings.UpdateMinutes)
 $WatchFolder   = if ($Settings.WatchFolder) { $Settings.WatchFolder } else { Join-Path $env:USERPROFILE 'Downloads\AutoPrint' }
@@ -93,13 +99,17 @@ function Get-PrintJob($file) {
 
     $copies = 1
     if ($isLabel) {
+        $copies = $LabelCopies
         # Labels are black and white anyway; monochrome keeps the print job small.
         $printer = $LabelPrinter; $scale = 'fit,monochrome'
         if ($PdfToText) {
             $text = (& $PdfToText -q $file.FullName - 2>$null) -join "`n"
             if ($text -match $PalletPattern) { $copies = $PalletCopies; $why += ', pallet label' }
         } else { Write-Log "  pdftotext not found; pallet labels print once" }
-    } else { $printer = $PagePrinter; $scale = 'shrink,paper=A4,simplex' }
+    } else {
+        $printer = $PagePrinter; $scale = 'shrink,paper=A4,simplex'
+        $copies = if ($file.Name -match '(?i)Invoice|CustInvc') { $InvoiceCopies } else { $PageCopies }
+    }
 
     # All copies in one SumatraPDF run instead of one run per copy.
     if ($copies -gt 1) { $scale += ",$($copies)x" }

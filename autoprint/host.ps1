@@ -40,6 +40,61 @@ function Get-FolderVersion {
     try { return [string]((Get-Content (Join-Path (Split-Path $here -Parent) 'manifest.json') -Raw | ConvertFrom-Json).version) } catch { return '' }
 }
 
+# ---- Settings page: printers and copies (27/11/2026) ----
+$ini    = Join-Path $here 'settings.ini'
+$defIni = Join-Path $here 'settings.default.ini'
+function Get-Setting($name, $fallback) {
+    foreach ($f in $ini, $defIni) {
+        if (-not (Test-Path $f)) { continue }
+        $m = Select-String -Path $f -Pattern ('^\s*' + $name + '\s*=\s*(.*?)\s*$') | Select-Object -First 1
+        if ($m -and $m.Matches[0].Groups[1].Value) { return $m.Matches[0].Groups[1].Value }
+    }
+    return $fallback
+}
+function Set-Setting($name, $value) {
+    $lines = if (Test-Path $ini) { @(Get-Content $ini) } else { @('; This PC''s AutoPrint settings. Updates never replace this file.') }
+    $found = $false
+    $lines = $lines | ForEach-Object { if ($_ -match ('^\s*' + $name + '\s*=')) { $found = $true; "$name = $value" } else { $_ } }
+    if (-not $found) { $lines += "$name = $value" }
+    Set-Content -Path $ini -Value $lines -Encoding UTF8
+}
+function Get-PrinterNames {
+    try { return @(Get-CimInstance Win32_Printer | Select-Object -ExpandProperty Name | Sort-Object) } catch { return @() }
+}
+function Restart-Helper {
+    Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'AutoPrint\.ps1' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Milliseconds 800
+    Start-Helper
+}
+function Handle-Request($req) {
+    if ($req.cmd -eq 'printers') {
+        Send-Message @{ reply = 'printers'; id = $req.id; ok = $true; printers = @(Get-PrinterNames)
+            label = (Get-Setting 'LabelPrinter' ''); page = (Get-Setting 'PagePrinter' '')
+            labelCopies = [int](Get-Setting 'LabelCopies' '1'); palletCopies = [int](Get-Setting 'PalletCopies' '2')
+            invoiceCopies = [int](Get-Setting 'InvoiceCopies' '1'); pageCopies = [int](Get-Setting 'PageCopies' '1') }
+        return $true
+    }
+    if ($req.cmd -eq 'save-printers') {
+        try {
+            $names = Get-PrinterNames
+            foreach ($p in $req.label, $req.page) { if ($p -and $names -notcontains $p) { throw "There's no printer called $p on this PC." } }
+            if ($req.label) { Set-Setting 'LabelPrinter' $req.label }
+            if ($req.page) { Set-Setting 'PagePrinter' $req.page }
+            foreach ($k in 'LabelCopies', 'PalletCopies', 'InvoiceCopies', 'PageCopies') {
+                $v = [int]$req.($k.Substring(0, 1).ToLower() + $k.Substring(1))
+                if ($v -ge 1 -and $v -le 9) { Set-Setting $k $v }
+            }
+            Restart-Helper
+            Send-Message @{ reply = 'save-printers'; id = $req.id; ok = $true }
+        } catch {
+            Send-Message @{ reply = 'save-printers'; id = $req.id; ok = $false; error = $_.Exception.Message }
+        }
+        return $true
+    }
+    return $false
+}
+
 function Report($started) {
     Send-Message @{ running = [bool](Test-HelperRunning); started = [bool]$started; folder = $here; version = (Get-FolderVersion) }
 }
@@ -53,12 +108,16 @@ $read = $stdin.ReadAsync($head, 0, 4)
 while ($true) {
     if ($read.Wait(5000)) {
         if ($read.Result -le 0) { break }   # the browser closed the connection
-        # Read (and ignore) the message body; any message means "check and report".
+        # Read the message. Settings-page requests get their own answer; anything else
+        # means "check and report".
         $len = [BitConverter]::ToInt32($head, 0)
+        $req = $null
         if ($len -gt 0 -and $len -lt 1048576) {
             $body = New-Object byte[] $len; $got = 0
             while ($got -lt $len) { $n = $stdin.Read($body, $got, $len - $got); if ($n -le 0) { break }; $got += $n }
+            try { $req = [Text.Encoding]::UTF8.GetString($body, 0, $got) | ConvertFrom-Json } catch { $req = $null }
         }
+        if ($req -and $req.cmd -and (Handle-Request $req)) { $read = $stdin.ReadAsync($head, 0, 4); continue }
         $restarted = $false
         if (-not (Test-HelperRunning)) { Start-Helper; $restarted = $true }
         Report $restarted

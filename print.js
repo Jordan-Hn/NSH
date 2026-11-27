@@ -15,6 +15,17 @@
   try {
     if (localStorage.getItem("nshOff") === "1") return;
   } catch (e) {}
+  // This browser's Settings (copied into the page by content.js, 27/11/2026). Anything not
+  // set falls back to how the tool worked before there were settings.
+  const SET = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+  const setting = (k, d) => (SET[k] === undefined ? d : SET[k]);
+  const toolOff = (k) => !!(SET.tools && SET.tools[k] === false);
 
   // On the Bulk Waves pages this file only lends its ticket code (window.__nshTickets);
   // its own panel only appears on Print Picking Tickets.
@@ -122,7 +133,11 @@
   // A date box's value ("2026-12-02") as the SOP writes it on a store ticket: "2/12".
   function shortDate(iso) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-    return m ? Number(m[3]) + "/" + Number(m[2]) : "";
+    if (!m) return "";
+    const fmt = setting("delFormat", "d/m"); // Settings: d/m, dd/mm or d/m/yy
+    if (fmt === "dd/mm") return m[3] + "/" + m[2];
+    if (fmt === "d/m/yy") return Number(m[3]) + "/" + Number(m[2]) + "/" + m[1].slice(2);
+    return Number(m[3]) + "/" + Number(m[2]);
   }
 
   // How the stamp reads (for the check screen); on the ticket "WAVE:" is small.
@@ -234,6 +249,7 @@
     const bytes = new Uint8Array(await resp.arrayBuffer());
     if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") throw new Error("NetSuite didn't send a PDF (logged out?)");
     // Tidy the crowded header block (lib/packingslip-fix.js); any problem = the ticket as NetSuite made it.
+    if (!setting("tidy", true)) return bytes;
     try {
       const tidy = window.nshFixPickingTicket && (await window.nshFixPickingTicket(bytes));
       if (tidy) return tidy;
@@ -303,7 +319,9 @@
       //         end is read from the page; if that fails, top left as before.
       //   code: top right, above "Picking Ticket" (VIC, ST, PU, MULTIDROP, 1/3...)
       // No wave yet: "NO WAVE" in its place, large (23/11/2026).
-      const s = stamps && stamps[i];
+      const s0 = stamps && stamps[i];
+      // Settings can turn each stamp off (27/11/2026).
+      const s = s0 && { wave: setting("stampWave", true) ? s0.wave : null, code: setting("stampCode", true) ? s0.code : "", del: setting("stampDel", true) ? s0.del : "", noWave: !setting("stampWave", true) };
       if (s && pages[0]) {
         const { width, height } = pages[0].getSize();
         const big = 22;
@@ -317,7 +335,9 @@
         }
         const wx = addr === null ? 40 : 36;
         const wy = addr === null ? y : addr - 22; // fits the 26 pt gap above the item table (6-line address)
-        if (s.wave) {
+        if (s.noWave) {
+          // wave stamp turned off in Settings
+        } else if (s.wave) {
           pages[0].drawText("WAVE: ", { x: wx, y: wy, size: small, font });
           pages[0].drawText(s.wave, { x: wx + font.widthOfTextAtSize("WAVE: ", small), y: wy, size: big, font });
         } else {
@@ -662,6 +682,8 @@
     };
     return;
   }
+
+  if (toolOff("bulkPrint")) return; // the Bulk Print panel is turned off in Settings
 
   function main() {
     let prefill = "";

@@ -17,6 +17,18 @@
   try {
     if (localStorage.getItem("nshOff") === "1") return;
   } catch (e) {}
+  // This browser's Settings (copied into the page by content.js, 27/11/2026). Anything not
+  // set falls back to how the tool worked before there were settings.
+  const SET = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+  const setting = (k, d) => (SET[k] === undefined ? d : SET[k]);
+  const toolOff = (k) => !!(SET.tools && SET.tools[k] === false);
+  if (toolOff("shipOrders")) return;
 
   // Lives on the Item Fulfillment search page (light; the full list page loads
   // every fulfilment since 2019): /app/common/search/search.nl?searchtype=Transaction&Transaction_TYPE=ItemShip
@@ -177,13 +189,16 @@
   }
 
   // Shipping method from the tracker courier (SOP 2 part C).
+  // Methods can be changed per courier in Settings (27/11/2026).
+  const methodById = (id, fallback) => Object.values(METHOD).find((m) => m.id === String(id)) || fallback;
   function methodFor(row) {
-    if (row.isTO) return METHOD.CHILL_EXPRESS;
-    if (row.courier === "CHILL") return METHOD.CHILL;
-    if (row.courier === "STE") return METHOD.STE;
-    if (row.courier === "STP") return METHOD.STP;
-    if (row.courier === "FW") return row.ctn <= 3 ? METHOD.FW_SMALL : METHOD.FW_BIG;
-    if (row.courier === "PICKUP") return METHOD.PICKUP;
+    const cm = setting("courierMethods", {}) || {};
+    if (row.isTO) return methodById(setting("toMethod", METHOD.CHILL_EXPRESS.id), METHOD.CHILL_EXPRESS);
+    if (row.courier === "CHILL") return methodById(cm.CHILL, METHOD.CHILL);
+    if (row.courier === "STE") return methodById(cm.STE, METHOD.STE);
+    if (row.courier === "STP") return methodById(cm.STP, METHOD.STP);
+    if (row.courier === "FW") return row.ctn <= 3 ? methodById(cm.FW_SMALL, METHOD.FW_SMALL) : methodById(cm.FW_BIG, METHOD.FW_BIG);
+    if (row.courier === "PICKUP") return methodById(cm.PICKUP, METHOD.PICKUP);
     return null;
   }
 
@@ -465,7 +480,13 @@
       // Items left off a done wave are ignored (23/11/2026): the pick tasks are Done, so it ships.
       p.iff = ifs[0];
       p.isTO = !!row.isTO;
-      p.interflora = /^INTERFLORA/i.test(rec.customer);
+      // Paperwork by customer (Settings, 27/11/2026; Interflora gets a packing slip by default):
+      // "slip" = packing slip instead of the invoice, "both" = slip and invoice, else invoice.
+      const rule = (setting("paperwork", [{ name: "Interflora", paper: "slip" }]) || []).find(
+        (r) => r && String(r.name || "").trim() && String(rec.customer || "").toUpperCase().startsWith(String(r.name).trim().toUpperCase())
+      );
+      p.paper = rule ? rule.paper : "invoice";
+      p.interflora = p.paper === "slip" || p.paper === "both"; // gets a packing slip after the labels
       p.listAfter = /^MYER/i.test(rec.customer) ? "Myer ASN" : /^COLES/i.test(rec.customer) ? "Coles portal" : "";
       return out("ship", "");
     });
@@ -661,7 +682,7 @@
 
   // ---------- printing in pasted order ----------
 
-  const WORKERS = 3; // orders worked on at once
+  const WORKERS = Math.min(3, Math.max(1, Number(setting("workers", 3)) || 3)); // orders worked on at once (Settings)
   // Each order collects its PDFs here as it goes ({bytes, name} or {url, name}).
   function queuePrint(p, job) {
     (p.prints = p.prints || []).push(job);
@@ -713,6 +734,7 @@
   // Packing slips: the template's overlapping placeholder text is tidied (lib/packingslip-fix.js);
   // if that ever fails, the slip prints as NetSuite made it.
   async function tidySlip(bytes) {
+    if (!setting("tidy", true)) return bytes;
     try {
       return (window.nshFixPackingSlip && (await window.nshFixPackingSlip(bytes))) || bytes;
     } catch (e) {
@@ -1198,10 +1220,11 @@
     }
 
     // 4. Interflora: packing slip straight after the labels (SOP 2 part F prints it before Bill).
-    if (p.interflora && !d.paper) {
+    if (p.interflora && !d.slip && !d.paper) {
       say("Getting the packing slip...");
       queuePrint(p, { bytes: await tidySlip(await fetchPdf(packingSlipUrl(p.rec.id, ifId))), name: "PackingSlip_" + p.row.so + ".pdf" });
-      d.paper = true;
+      d.slip = true;
+      if (p.paper !== "both") d.paper = true; // slip instead of the invoice
     }
 
     // 5. Bill (never twice: check NetSuite for an invoice first).
@@ -1286,7 +1309,7 @@
       say("Getting the invoice...");
       {
         let pdf = await fetchPdf(invoicePdfUrl(p.invoice.id));
-        if (p.row.courier !== "PICKUP") pdf = await stampConnote(pdf, p.connote);
+        if (p.row.courier !== "PICKUP" && setting("connote", true)) pdf = await stampConnote(pdf, p.connote);
         queuePrint(p, { bytes: pdf, name: "Invoice_" + p.invoice.tranid + ".pdf" });
       }
       d.paper = true;
@@ -1659,7 +1682,7 @@
             '<tr data-i="' + i + '" class="' + (p.action === "flag" ? "nsh-wave-bad" : p.action === "skip" ? "nsh-wave-wait" : "") + '"><td>' +
             (p.action === "ship" ? '<input type="checkbox" class="nsh-ship-pick" checked aria-label="Ship ' + esc(p.row.so) + '">' : "") +
             "</td><td>" + orderLink(p) + "</td><td>" + esc(p.row.customer) +
-            "</td><td>" + methodCell(p, i) + (p.push ? "<br>Store order, no packages: marked Shipped only" : p.row.isTO ? "<br>Store order: packing slip, not billed" : p.interflora ? "<br>Packing slip, not invoice" : "") +
+            "</td><td>" + methodCell(p, i) + (p.push ? "<br>Store order, no packages: marked Shipped only" : p.row.isTO ? "<br>Store order: packing slip, not billed" : p.interflora ? (p.paper === "both" ? "<br>Packing slip and invoice" : "<br>Packing slip, not invoice") : "") +
             "</td><td>" + esc(pkgText(p.row)) + '</td><td class="nsh-ship-sleeve">' + esc(p.action === "ship" ? p.code : "") + '</td><td><span class="nsh-ship-status">' +
             esc(p.action === "ship" ? (p.warn.join("; ") || "Ready") : (p.action === "flag" ? "Not shipped: " : "Skipped: ") + p.why) + "</span>" +
             // Already shipped by someone (or a run that stopped early): their labels may not be out.
@@ -1908,7 +1931,7 @@
     // A save NetSuite didn't take gets one more go by itself, one order at a time, before
     // the run ends (27/11/2026). Finished steps aren't repeated (p.done), and its paperwork
     // prints once it's through.
-    if (!limitHit && !dry) {
+    if (!limitHit && !dry && setting("autoRetry", true)) {
       const again = todo.filter((k) => work[k].result === "failed" && /didn't save/.test(work[k].note || ""));
       for (const k of again) {
         work[k].note = "Trying again...";

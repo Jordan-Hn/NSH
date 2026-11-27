@@ -19,6 +19,18 @@
   try {
     if (localStorage.getItem("nshOff") === "1") return;
   } catch (e) {}
+  // This browser's Settings (copied into the page by content.js, 27/11/2026). Anything not
+  // set falls back to how the tool worked before there were settings.
+  const SET = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+  const setting = (k, d) => (SET[k] === undefined ? d : SET[k]);
+  const toolOff = (k) => !!(SET.tools && SET.tools[k] === false);
+  if (toolOff("bulkWaves")) return;
 
   const JOB_KEY = "nshBulkWavesJob"; // shared run (localStorage, all tabs)
   const TAB_KEY = "nshBulkWavesTab"; // this tab's part in it (sessionStorage)
@@ -338,6 +350,8 @@
   // How many extra tabs to open for a run of this size. Saves happen one at a
   // time in list order, so more than 3 tabs in total wouldn't help.
   function helpersFor(count) {
+    const fixed = setting("waveHelpers", "auto"); // Settings: "auto" or 0 / 1 / 2
+    if (fixed !== "auto" && !isNaN(Number(fixed))) return Math.min(2, Math.max(0, Number(fixed)));
     return count >= 10 ? 2 : count >= 3 ? 1 : 0;
   }
 

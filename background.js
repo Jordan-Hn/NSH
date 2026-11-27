@@ -110,6 +110,13 @@ function connectHost() {
     return;
   }
   hostPort.onMessage.addListener((m) => {
+    // Answers to the Settings page's requests (printers, copies).
+    if (m && m.reply && hostWaits.has(m.id)) {
+      hostWaits.get(m.id)(m);
+      hostWaits.delete(m.id);
+      return;
+    }
+    if (m && m.reply) return;
     helperState = m && m.running ? "running" : "stopped";
     showHelperState();
     reloadIfUpdated(m && m.version);
@@ -171,6 +178,56 @@ async function anyToolBusy() {
   }
   return false;
 }
+
+// ---------- Settings (27/11/2026) ----------
+// This browser's settings (the Settings page saves them). Defaults = how things worked before.
+async function setting(key, fallback) {
+  try {
+    const v = (await chrome.storage.local.get("nshSettings")).nshSettings || {};
+    return v[key] === undefined ? fallback : v[key];
+  } catch (e) {
+    return fallback;
+  }
+}
+// Ask the AutoPrint host something and wait for its answer (Settings page: printers, copies).
+const hostWaits = new Map();
+function askHost(msg, timeout) {
+  return new Promise((resolve) => {
+    if (!hostPort) connectHost();
+    if (!hostPort) return resolve({ ok: false, error: "AutoPrint isn't set up on this PC (run Setup.cmd in the autoprint folder)." });
+    const id = Date.now() + "-" + Math.random();
+    const timer = setTimeout(() => {
+      hostWaits.delete(id);
+      resolve({ ok: false, error: "AutoPrint didn't answer." });
+    }, timeout || 20000);
+    hostWaits.set(id, (m) => {
+      clearTimeout(timer);
+      resolve(m);
+    });
+    try {
+      hostPort.postMessage(Object.assign({ id }, msg));
+    } catch (e) {
+      clearTimeout(timer);
+      hostWaits.delete(id);
+      resolve({ ok: false, error: "AutoPrint isn't connected." });
+    }
+  });
+}
+const SETTINGS_PAGE = chrome.runtime.getURL("settings.html");
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg) return;
+  if (msg.type === "nsh-open-settings") {
+    chrome.runtime.openOptionsPage();
+    return;
+  }
+  if ((msg.type === "nsh-printers-get" || msg.type === "nsh-printers-save") && sender.url && sender.url.startsWith(SETTINGS_PAGE)) {
+    const req = msg.type === "nsh-printers-get"
+      ? { cmd: "printers" }
+      : { cmd: "save-printers", label: msg.label, page: msg.page, labelCopies: msg.labelCopies, palletCopies: msg.palletCopies, invoiceCopies: msg.invoiceCopies, pageCopies: msg.pageCopies };
+    askHost(req, msg.type === "nsh-printers-get" ? 20000 : 30000).then(reply);
+    return true;
+  }
+});
 
 // Make sure the helper is up (starts the connection if needed, else asks it to check).
 function checkHelper() {
@@ -377,6 +434,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (pluginOff) return;
   const url = info.url || tab.url;
   if (info.status !== "loading" || !url || !isPackingSlip(url) || /#nsh-original$/.test(url)) return;
+  if (!(await setting("tidy", true))) return;
   const seen = tabId + "|" + url;
   if (slipSwapped.has(seen)) return;
   if ((await netsuiteTabFor(tab)) == null) return; // no NetSuite tab to fetch through: the old way (after load) handles it
@@ -397,6 +455,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (pluginOff) return;
   if (info.status !== "complete" || !tab.url || !isPackingSlip(tab.url) || /#nsh-original$/.test(tab.url)) return;
+  if (!(await setting("tidy", true))) return;
   const seen = tabId + "|" + tab.url;
   if (slipSwapped.has(seen)) return;
   slipSwapped.add(seen);
@@ -453,7 +512,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
   checkHelper(); // starts AutoPrint if it isn't running (the file waits in the folder until it is)
-  const invoiceId = invoiceIdFrom(tab.url);
+  const invoiceId = (await setting("connote", true)) ? invoiceIdFrom(tab.url) : null;
   if (invoiceId) {
     try {
       const stamped = await invoiceWithConnote(tab, invoiceId);
@@ -466,7 +525,7 @@ chrome.action.onClicked.addListener(async (tab) => {
       console.warn("Connote stamp skipped:", e); // fall through: print it as it is
     }
   }
-  if (isPackingSlip(tab.url)) {
+  if (isPackingSlip(tab.url) && (await setting("tidy", true))) {
     try {
       const tidied = await tidiedPackingSlip(tab);
       if (tidied) {

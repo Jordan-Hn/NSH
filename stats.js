@@ -23,6 +23,18 @@
   try {
     if (localStorage.getItem("nshOff") === "1") return;
   } catch (e) {}
+  // This browser's Settings (copied into the page by content.js, 27/11/2026). Anything not
+  // set falls back to how the tool worked before there were settings.
+  const SET = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  })();
+  const setting = (k, d) => (SET[k] === undefined ? d : SET[k]);
+  const toolOff = (k) => !!(SET.tools && SET.tools[k] === false);
+  if (toolOff("pending")) return;
 
   // The search's own results page, or the Home dashboard (its portlet of the same search, 25/11/2026).
   const onResults = /[?&]searchid=146970(&|$)/.test(location.search);
@@ -71,9 +83,10 @@
   const isSamples = (r) => /^Samples\b/i.test(r.name);
 
   function bucket(r, t) {
-    if (isSamples(r)) return "samples";
+    if (isSamples(r) && setting("samplesSection", true)) return "samples";
     if (r.day == null) return "nodate";
-    if (r.day < t) return "overdue";
+    if (r.day < t - (Number(setting("overdueGrace", 0)) || 0)) return "overdue"; // Settings: days of grace
+    if (r.day < t) return "today"; // inside the grace days: still to go today
     if (r.day === t) return "today";
     if (r.day === t + 1) return "tomorrow";
     return "later";
@@ -229,7 +242,7 @@
       const i = (seen[b] = (seen[b] || 0) + 1) - 1;
       tr.classList.remove("uir-list-row-even", "uir-list-row-odd");
       tr.classList.add(i % 2 ? "uir-list-row-odd" : "uir-list-row-even");
-      shade(tr, b === "overdue" ? "#fbe3e3" : i % 2 ? "#e8edf4" : "#ffffff", b === "overdue" ? "#fbe3e3" : "#ffffff");
+      shade(tr, b === "overdue" ? OVERDUE_BG : i % 2 ? STRIPE_BG : "#ffffff", b === "overdue" ? OVERDUE_BG : "#ffffff");
     });
     // Section headings: hide empty ones, show how many are listed.
     document.querySelectorAll("tr.nsh-group-row").forEach((g) => {
@@ -250,6 +263,8 @@
   // grey stripes, light red for overdue.
   // Cells point at a variable rather than the colour itself, so the Tiles view can
   // swap the stripes for plain white cards (content.css sets --nsh-cell-bg there).
+  const STRIPE_BG = setting("stripeColour", "#e8edf4"); // Settings
+  const OVERDUE_BG = setting("overdueColour", "#fbe3e3");
   function shade(tr, colour, tileColour) {
     tr.style.setProperty("--nsh-row-bg", colour);
     tr.style.setProperty("--nsh-cell-bg", colour);
@@ -276,7 +291,7 @@
         // Keep NetSuite's alternating row shading within each section.
         r.tr.classList.remove("uir-list-row-even", "uir-list-row-odd");
         r.tr.classList.add(i % 2 ? "uir-list-row-odd" : "uir-list-row-even");
-        shade(r.tr, b === "overdue" ? "#fbe3e3" : i % 2 ? "#e8edf4" : "#ffffff", b === "overdue" ? "#fbe3e3" : "#ffffff");
+        shade(r.tr, b === "overdue" ? OVERDUE_BG : i % 2 ? STRIPE_BG : "#ffffff", b === "overdue" ? OVERDUE_BG : "#ffffff");
         parent.appendChild(r.tr);
       });
     });

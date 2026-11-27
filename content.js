@@ -17,6 +17,36 @@
   } catch (e) {}
   if (switchedOff) return;
 
+  // ---------- Settings (27/11/2026) ----------
+  // The Settings page keeps them in this browser (chrome.storage.local "nshSettings").
+  // They're copied into the page's own storage so the page scripts (which can't ask the
+  // extension) can read them. When something changes in Settings, the tick boxes and
+  // choices the tools remember on their own pages are set to match once.
+  let SET = {};
+  try {
+    SET = JSON.parse(localStorage.getItem("nshSettings") || "{}") || {};
+  } catch (e) {}
+  const toolOn = (k) => !(SET.tools && SET.tools[k] === false);
+  function applySettings(s) {
+    if (!s) return;
+    SET = s;
+    try {
+      localStorage.setItem("nshSettings", JSON.stringify(s));
+      if (String(s.rev || "") !== (localStorage.getItem("nshSettingsRev") || "")) {
+        const yn = (v) => (v ? "1" : "0");
+        const own = { shipAutoPrint: ["nshShipAutoPrint", yn], wavesAutoPrint: ["nshWavesAutoPrint", yn], toSlips: ["nshShipToSlips", yn], pendingView: ["nshPendingLayout", String], stockLabel: ["nshStockLabel", String] };
+        Object.keys(own).forEach((k) => {
+          if (s[k] !== undefined) localStorage.setItem(own[k][0], own[k][1](s[k]));
+        });
+        localStorage.setItem("nshSettingsRev", String(s.rev || ""));
+      }
+    } catch (e) {}
+  }
+  try {
+    chrome.storage.local.get("nshSettings", (v) => applySettings(v && v.nshSettings));
+    chrome.storage.onChanged.addListener((c, area) => area === "local" && c.nshSettings && applySettings(c.nshSettings.newValue));
+  } catch (e) {}
+
   // ---------- Enter in the Helper's paste boxes ----------
   // Enter (with or without Shift) in any of the Helper's paste boxes just makes a new
   // line. NetSuite's own key handling would otherwise submit the page's form: on the Item
@@ -100,6 +130,15 @@
     "custbodyrsc_freight_carrier_consid", // Consignment ID on item fulfilments, e.g. KKB123456
   ];
   function copyFields() {
+    // Settings "Click any field on a record to copy it" (on unless turned off): every
+    // labelled field's value in view mode, e.g. Order #, Date, From / To Location.
+    if (SET.copyAll !== false) {
+      document.querySelectorAll('.uir-field-wrapper[data-mode="view"] .uir-field').forEach((el) => {
+        if (el.querySelector("input, select, textarea, img, .checkbox, .uir-field-checkbox")) return;
+        if (el.textContent.replace(/ /g, " ").trim()) makeCopyable(el);
+      });
+      return;
+    }
     COPY_FIELDS.forEach((name) => {
       document
         .querySelectorAll('.uir-field-wrapper[data-field-name="' + name + '"][data-mode="view"] .uir-field')
@@ -140,13 +179,15 @@
   // A "NetSuite Helper" box at the top of the Home dashboard's left column,
   // built like NetSuite's own portlets, linking to each tool's page.
   const TOOL_PAGES = [
-    { name: "Pending Orders", what: "Not printed yet, by ship date, with stock", url: "/app/common/search/searchresults.nl?searchid=146970&whence=" },
-    { name: "Bulk Waves", what: "Paste TOs/SOs, make a wave each, in list order", url: "/app/accounting/wms/orderrelease/searchform/searchorders.nl" },
-    { name: "Bulk Print Picking Tickets", what: "Paste TOs/SOs, one stamped PDF in list order", url: "/app/accounting/print/printform.nl?trantype=salesord&printtype=pickingticket&method=print&title=Picking+Tickets" },
-    { name: "Ship Orders", what: "Paste tracker rows, ship, bill and print", url: "/app/common/search/search.nl?searchtype=Transaction&Transaction_TYPE=ItemShip" },
-    { name: "Bulk Open", what: "Paste numbers, open each in a new tab", url: "/app/common/search/search.nl?searchtype=Transaction&Transaction_TYPE=ItemShip#nsh-open-panel" },
+    { key: "pending", name: "Pending Orders", what: "Not printed yet, by ship date, with stock", url: "/app/common/search/searchresults.nl?searchid=146970&whence=" },
+    { key: "bulkWaves", name: "Bulk Waves", what: "Paste TOs/SOs, make a wave each, in list order", url: "/app/accounting/wms/orderrelease/searchform/searchorders.nl" },
+    { key: "bulkPrint", name: "Bulk Print Picking Tickets", what: "Paste TOs/SOs, one stamped PDF in list order", url: "/app/accounting/print/printform.nl?trantype=salesord&printtype=pickingticket&method=print&title=Picking+Tickets" },
+    { key: "shipOrders", name: "Ship Orders", what: "Paste tracker rows, ship, bill and print", url: "/app/common/search/search.nl?searchtype=Transaction&Transaction_TYPE=ItemShip" },
+    { key: "bulkOpen", name: "Bulk Open", what: "Paste numbers, open each in a new tab", url: "/app/common/search/search.nl?searchtype=Transaction&Transaction_TYPE=ItemShip#nsh-open-panel" },
   ];
+  const toolPages = () => TOOL_PAGES.filter((t) => toolOn(t.key));
   function addHomeShortcuts() {
+    if (!toolOn("homeBox")) return;
     if (!/\/app\/center\/card\.nl$/.test(location.pathname) || !/(^|[?&])sc=-29(&|$)/.test(location.search)) return;
     if (document.getElementById("nsh-home-portlet")) return;
     const column = document.getElementById("dashboard-column-1");
@@ -157,7 +198,7 @@
     box.innerHTML =
       '<div class="ns-portlet-header nsh-home-header"><h2 class="ns-portlet-header-text">NetSuite Helper</h2></div>' +
       '<div class="nsh-home-grid">' +
-      TOOL_PAGES.map((t) => '<a class="nsh-home-tile" href="' + t.url + '"><span class="nsh-home-name">' + t.name + '</span><span class="nsh-home-what">' + t.what + "</span></a>").join("") +
+      toolPages().map((t) => '<a class="nsh-home-tile" href="' + t.url + '"><span class="nsh-home-name">' + t.name + '</span><span class="nsh-home-what">' + t.what + "</span></a>").join("") +
       "</div>";
     column.insertBefore(box, column.firstChild);
     applyThemeColour(box);
@@ -211,12 +252,21 @@
     navDrop.className = "nsh-nav-drop";
     navDrop.innerHTML =
       '<div class="nsh-nav-drop-body"><div role="menu" class="' + cls.menu + '">' +
-      TOOL_PAGES.map(
+      toolPages().concat([{ name: "Settings", url: "#nsh-settings" }]).map(
         (t) =>
           '<div role="group" class="' + cls.group + '"><div role="menuitem" class="nsh-nav-row ' + cls.item + '">' +
           '<a class="' + cls.a + '" href="' + t.url + '"><div class="' + cls.div + '"><span class="' + cls.span + '">' + t.name + "</span></div></a></div></div>"
       ).join("") +
       "</div></div>";
+    // Settings opens the extension's Settings page (only the extension can open it).
+    const settingsLink = navDrop.querySelector('a[href="#nsh-settings"]');
+    if (settingsLink)
+      settingsLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        try {
+          chrome.runtime.sendMessage({ type: "nsh-open-settings" });
+        } catch (err) {}
+      });
     navDrop.querySelectorAll(".nsh-nav-row").forEach((row) => {
       row.addEventListener("mouseenter", () => row.classList.add(cls.hover));
       row.addEventListener("mouseleave", () => row.classList.remove(cls.hover));
@@ -274,6 +324,7 @@
     }, 200);
   }
   function addNavMenu() {
+    if (!toolOn("helperMenu")) return;
     if (document.getElementById("nsh-nav-item")) return;
     const group = document.querySelector('[role="menubar"] [role="group"]');
     const last = group && group.lastElementChild;
