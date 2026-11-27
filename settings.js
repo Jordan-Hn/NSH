@@ -38,7 +38,6 @@
     connote: true,
     tidy: true,
     tools: { pending: true, shipOrders: true, bulkOpen: true, bulkWaves: true, bulkPrint: true, copyRow: true, homeBox: true, helperMenu: true },
-    copyAll: true,
   };
   const METHODS = [
     ["58051", "Chill Refrigerated Transport - General"],

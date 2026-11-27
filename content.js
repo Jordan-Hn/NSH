@@ -140,17 +140,6 @@
     "custbodyrsc_freight_carrier_consid", // Consignment ID on item fulfilments, e.g. KKB123456
   ];
   function copyFields() {
-    // Settings "Click any field on a record to copy it" (on unless turned off): every
-    // labelled field's value in view mode, e.g. Order #, Date, From / To Location.
-    if (SET.copyAll !== false) {
-      document.querySelectorAll('.uir-field-wrapper[data-mode="view"] .uir-field').forEach((el) => {
-        if (el.querySelector("input, select, textarea, img, .checkbox, .uir-field-checkbox")) return;
-        // Values that are links (wave, Created From, customer...) stay links (27/11/2026).
-        if (el.querySelector("a[href]") || el.closest("a[href]")) return;
-        if (el.textContent.replace(/ /g, " ").trim()) makeCopyable(el);
-      });
-      return;
-    }
     COPY_FIELDS.forEach((name) => {
       document
         .querySelectorAll('.uir-field-wrapper[data-field-name="' + name + '"][data-mode="view"] .uir-field')
