@@ -105,7 +105,7 @@ function Get-PrintJob($file) {
     if ($copies -gt 1) { $scale += ",$($copies)x" }
     $pages = Get-PageCount $file.FullName
     if ($pages -gt 1) { $why += ", $pages pages" }
-    return [pscustomobject]@{ File = $file; Printer = $printer; Settings = $scale; Copies = $copies; Pages = $pages; Why = $why }
+    return [pscustomobject]@{ File = $file; Printer = $printer; Settings = $scale; Copies = $copies; Pages = $pages; Why = $why; Order = (Get-SendOrder $file.Name); QueuedAt = (Get-Date) }
 }
 
 # Page count (pdfinfo, else counted in the file), 1 if unknown. Sets how long a print may take.
@@ -129,10 +129,36 @@ $Queues  = @{}   # printer -> list of jobs waiting
 $Busy    = @{}   # printer -> @{ Job; Proc; Start }
 $Pending = @{}   # file path -> first time seen (waiting for the browser to finish)
 
+# Print in the order things were SENT, not the order the browser finished saving them
+# (27/11/2026: a bigger invoice sent first finished saving after a smaller one sent just
+# after it, and printed second). File names start with the time they were sent; each
+# printer's queue is kept in that order, and a job waits (up to 20 s) while a file sent
+# before it is still being saved, plus a moment after it lands so its neighbours can too.
+function Get-SendOrder([string]$name) {
+    if ($name -match '^(\d{10,})_') { return [int64]$Matches[1] }
+    return [int64]::MaxValue
+}
+function Add-ToQueue($job) {
+    if (-not $Queues.ContainsKey($job.Printer)) { $Queues[$job.Printer] = New-Object System.Collections.ArrayList }
+    $q = $Queues[$job.Printer]
+    $at = $q.Count
+    for ($i = 0; $i -lt $q.Count; $i++) { if ($q[$i].Order -gt $job.Order) { $at = $i; break } }
+    $q.Insert($at, $job)
+}
+function Test-EarlierArriving($order) {
+    foreach ($path in @($Pending.Keys)) { if ((Get-SendOrder (Split-Path $path -Leaf)) -lt $order) { return $true } }
+    $saving = Get-ChildItem $WatchFolder -File -Filter *.crdownload -ErrorAction SilentlyContinue |
+        Where-Object { (Get-SendOrder $_.Name) -lt $order -and ((Get-Date) - $_.LastWriteTime).TotalSeconds -lt 20 }
+    return [bool]$saving
+}
+
 function Start-Next($printer) {
     $q = $Queues[$printer]
     if (-not $q -or $q.Count -eq 0) { return }
-    $job = $q[0]; $q.RemoveAt(0)
+    $job = $q[0]
+    if (((Get-Date) - $job.QueuedAt).TotalSeconds -lt 1.5) { return }
+    if (((Get-Date) - $job.QueuedAt).TotalSeconds -lt 20 -and (Test-EarlierArriving $job.Order)) { return }
+    $q.RemoveAt(0)
     Write-Log "PRINT $($job.File.Name) -> $($job.Printer) x$($job.Copies) ($($job.Why))"
     $p = Start-Process -FilePath $Sumatra -ArgumentList @('-print-to', "`"$($job.Printer)`"", '-print-settings', $job.Settings, '-silent', '-exit-when-done', "`"$($job.File.FullName)`"") -PassThru -WindowStyle Hidden
     $Busy[$printer] = @{ Job = $job; Proc = $p; Start = Get-Date }
@@ -212,7 +238,8 @@ while ($true) {
         $NextUpdate = (Get-Date).AddMinutes($UpdateMinutes)
         try { Start-UpdateCheck } catch { Write-Log "Update check didn't start: $($_.Exception.Message)" }
     }
-    $quick = ($Busy.Count -gt 0) -or ($Pending.Count -gt 0)
+    $queued = @($Queues.Values | Where-Object { $_.Count -gt 0 }).Count -gt 0
+    $quick = ($Busy.Count -gt 0) -or ($Pending.Count -gt 0) -or $queued
     $wait = if ($quick) { 250 } else { [int]($PollSeconds * 1000) }
     [void]$watcher.WaitForChanged([System.IO.WatcherChangeTypes]::All, $wait)
 
@@ -224,9 +251,7 @@ while ($true) {
         try {
             if (Test-FileReady $path) {
                 $Pending.Remove($path)
-                $job = Get-PrintJob (Get-Item -LiteralPath $path)
-                if (-not $Queues.ContainsKey($job.Printer)) { $Queues[$job.Printer] = New-Object System.Collections.ArrayList }
-                [void]$Queues[$job.Printer].Add($job)
+                Add-ToQueue (Get-PrintJob (Get-Item -LiteralPath $path))
             } elseif (((Get-Date) - $Pending[$path]).TotalSeconds -gt 15) {
                 $Pending.Remove($path)
                 Write-Log "SKIP (file stayed locked): $(Split-Path $path -Leaf)"
