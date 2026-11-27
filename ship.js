@@ -401,21 +401,27 @@
       if (/^MYER/i.test(rec.customer) && (row.courier !== "CHILL" || !row.plt)) return out("flag", "Myer should be Chill and pallets");
       const fam = row.isTO ? "" : family(rec.shipVia);
       if (fam && fam !== courierFamily(row.courier)) return out("flag", "Order's Ship Via is " + rec.shipVia + ", tracker says " + row.courier);
-      // Two fulfilments, one from Warehouses : Online and one from a warehouse (25/11/2026):
-      // the Online one is just marked Shipped (Custom, no packages); the warehouse one gets
-      // the courier, the packages, the labels and the invoice (its Bill button, as usual).
+      // Several fulfilments where exactly one is from a warehouse and the rest are from
+      // Warehouses : Online (two since 25/11/2026, any number since 27/11/2026): the Online
+      // ones are just marked Shipped (Custom, no packages); the warehouse one gets the
+      // courier, the packages, the labels and the invoice (its Bill button, as usual).
       let ifs = rec.ifs;
-      if (ifs.length === 2 && !row.isTO) {
+      if (ifs.length >= 2 && !row.isTO) {
         const online = ifs.filter((f) => /online/i.test(f.location || ""));
         const house = ifs.filter((f) => !/online/i.test(f.location || ""));
-        if (online.length === 1 && house.length === 1) {
+        if (online.length >= 1 && house.length === 1) {
           ifs = house;
-          if (online[0].statusRef !== "shipped") p.onlineIf = online[0];
-          p.warn.push("Two fulfilments: " + online[0].tranid + " (Online) " + (p.onlineIf ? "is just marked Shipped (Custom, no packages)" : "is already Shipped") + "; " + house[0].tranid + " gets the courier, packages, labels and the invoice");
+          const todo = online.filter((f) => f.statusRef !== "shipped");
+          if (todo.length) {
+            p.onlineIfs = todo;
+            p.onlineIf = todo[0];
+          }
+          const names = online.map((f) => f.tranid).join(", ");
+          p.warn.push((online.length + 1) + " fulfilments: " + names + " (Online) " + (todo.length ? (todo.length === online.length ? "" : todo.map((f) => f.tranid).join(", ") + " ") + (todo.length > 1 ? "are" : "is") + " just marked Shipped (Custom, no packages)" : "already Shipped") + "; " + house[0].tranid + " gets the courier, packages, labels and the invoice");
         }
       }
       const open = ifs.filter((f) => f.statusRef !== "shipped");
-      if (ifs.length > 1) return out("flag", "Two item fulfilments, do it by hand");
+      if (ifs.length > 1) return out("flag", ifs.length + " item fulfilments not from one warehouse plus Online, do it by hand");
       // Store orders only (retail SOP 3): a wave that isn't Complete, or a wave with no item
       // fulfilment yet, gets its Ready pick tasks marked Done first (25/11/2026). SOs: flagged.
       if (!ifs.length && rec.wave) {
@@ -1023,11 +1029,15 @@
     const ifUrl = "/app/accounting/transactions/itemship.nl?id=" + ifId;
     if (p.push) return pushOrder(p, dry, say, slot);
     // The Online fulfilment of a two-fulfilment order: just Shipped (Custom) first.
-    if (p.onlineIf && !d.onlineDone) {
-      const r = await shipAsCustom(p.onlineIf, dry, say, slot);
-      if (dry) p.dryOnline = p.onlineIf.tranid + ": " + r.status + ", " + r.method;
-      else d.onlineDone = true;
+    const onlineIfs = p.onlineIfs || (p.onlineIf ? [p.onlineIf] : []);
+    const dryOnline = [];
+    for (const oif of onlineIfs) {
+      if (d["online_" + oif.id] || (oif === p.onlineIf && d.onlineDone)) continue;
+      const r = await shipAsCustom(oif, dry, say, slot);
+      if (dry) dryOnline.push(oif.tranid + ": " + r.status + ", " + r.method);
+      else d["online_" + oif.id] = true;
     }
+    if (dry && dryOnline.length) p.dryOnline = dryOnline.join("; ");
 
     // 1. Ship (skipped if NetSuite already shows it shipped).
     let justSaved = false;
@@ -1935,7 +1945,7 @@
         await freshLookups(500);
         p.result = await runOrder(p, dry, say, slot);
         p.note = p.result === "dry"
-          ? "Dry run OK: " + p.dryResult.status + ", " + p.dryResult.method + (p.dryResult.carrier ? " (" + p.dryResult.carrier + ")" : "") + ", " + p.dryResult.packages + " packages, " + p.dryResult.weight + " kg." + (p.dryOnline ? " Online fulfilment " + p.dryOnline + "." : "") + " Not saved."
+          ? "Dry run OK: " + p.dryResult.status + ", " + p.dryResult.method + (p.dryResult.carrier ? " (" + p.dryResult.carrier + ")" : "") + ", " + p.dryResult.packages + " packages, " + p.dryResult.weight + " kg." + (p.dryOnline ? " Online fulfilment" + (p.dryOnline.includes(";") ? "s " : " ") + p.dryOnline + "." : "") + " Not saved."
           : "Done" + (p.noBill ? ", not billed (no Bill button on the order), packing slip printed" : "") + (p.listAfter ? ", now " + p.listAfter : "");
         if (p.fixedState) p.note += " (address fixed: " + p.fixedState + ")";
       } catch (err) {
