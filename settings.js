@@ -14,7 +14,15 @@
     workers: 3,
     autoRetry: true,
     shipAutoPrint: true,
-    courierMethods: { CHILL: "58051", STE: "66829", STP: "66831", FW_SMALL: "74678", FW_BIG: "74679", PICKUP: "28953" },
+    // Tracker COURIER codes (several with commas) -> method; "big" = the method for more than
+    // 3 cartons or any pallets ("" = the same method). Keep in step with ship.js DEFAULT_COURIERS.
+    couriers: [
+      { codes: "CHILL", method: "58051", name: "Chill Refrigerated Transport - General", big: "", bigName: "" },
+      { codes: "STE", method: "66829", name: "StarTrack Road Express", big: "", bigName: "" },
+      { codes: "STP", method: "66831", name: "StarTrack Premium", big: "", bigName: "" },
+      { codes: "FW, FREEWAY", method: "74678", name: "Freeway Courier <25kg Standard", big: "74679", bigName: "Freeway 1/2 Tonne <500kg Standard" },
+      { codes: "PICKUP, PU, PICK UP", method: "28953", name: "Click & Collect", big: "", bigName: "" },
+    ],
     waveHelpers: "auto",
     wavesAutoPrint: false,
     stampWave: true,
@@ -41,14 +49,6 @@
     ["74679", "Freeway 1/2 Tonne <500kg Standard"],
     ["28953", "Click & Collect"],
     ["6410", "Custom"],
-  ];
-  const COURIERS = [
-    ["CHILL", "CHILL"],
-    ["STE", "STE (StarTrack Express)"],
-    ["STP", "STP (StarTrack Premium)"],
-    ["FW_SMALL", "FW, 3 cartons or fewer"],
-    ["FW_BIG", "FW, more than 3 cartons or pallets"],
-    ["PICKUP", "PICKUP"],
   ];
   const TOOLS = [
     ["pending", "Pending Orders page"],
@@ -96,11 +96,48 @@
     t.querySelectorAll(".pw-del").forEach((b) => (b.onclick = () => (S.paperwork.splice(b.dataset.i, 1), drawPaperwork(), save())));
   }
 
+  // Every active NetSuite shipping method, as Ship Orders last read it (content.js keeps a
+  // copy in chrome.storage "nshMethodList"); the short list above until then.
+  let ALL_METHODS = METHODS;
+  const methodOpts = () => ALL_METHODS.map((m) => opt(m[0], m[1])).join("");
+  const methodName = (id) => (ALL_METHODS.find((m) => m[0] === String(id)) || [, ""])[1];
+
+  // One list of couriers (27/11/2026): tracker code(s), method, and an optional second method
+  // for more than 3 cartons or pallets. The usual ones start in the list and can be changed.
+  function fillMethod(s, id, name, blank) {
+    s.innerHTML = (blank ? opt("", "Same method") : "") + methodOpts();
+    if (id && !ALL_METHODS.some((m) => m[0] === String(id))) s.insertAdjacentHTML(blank ? "beforeend" : "afterbegin", opt(id, name || "Method " + id));
+    s.value = id || (blank ? "" : s.value);
+  }
+  function drawCouriers() {
+    const t = $("#couriers tbody");
+    t.innerHTML = S.couriers
+      .map(
+        (r, i) =>
+          `<tr><td><input type="text" data-i="${i}" class="cr-codes" value="${String(r.codes || "").replace(/"/g, "&quot;")}" placeholder="e.g. UBER" style="width:145px"></td>` +
+          `<td><select data-i="${i}" class="cr-method" style="width:200px"></select></td>` +
+          `<td><select data-i="${i}" class="cr-big" style="width:200px"></select></td>` +
+          `<td><button type="button" data-i="${i}" class="cr-del">Remove</button></td></tr>`
+      )
+      .join("");
+    t.querySelectorAll(".cr-method").forEach((s) => {
+      const r = S.couriers[s.dataset.i];
+      fillMethod(s, r.method, r.name, false);
+      if (!r.method) ((r.method = s.value), (r.name = methodName(s.value)));
+      s.onchange = () => ((r.method = s.value), (r.name = s.options[s.selectedIndex].text), save());
+    });
+    t.querySelectorAll(".cr-big").forEach((s) => {
+      const r = S.couriers[s.dataset.i];
+      fillMethod(s, r.big, r.bigName, true);
+      s.onchange = () => ((r.big = s.value), (r.bigName = s.value ? s.options[s.selectedIndex].text : ""), save());
+    });
+    const tidy = (v) => v.split(",").map((c) => c.trim().toUpperCase()).filter(Boolean).join(", ");
+    t.querySelectorAll(".cr-codes").forEach((inp) => (inp.onchange = () => ((S.couriers[inp.dataset.i].codes = tidy(inp.value)), drawCouriers(), save())));
+    t.querySelectorAll(".cr-del").forEach((b) => (b.onclick = () => (S.couriers.splice(b.dataset.i, 1), drawCouriers(), save())));
+  }
+
   function draw() {
-    document.querySelectorAll("select.method").forEach((s) => (s.innerHTML = METHODS.map((m) => opt(m[0], m[1])).join("")));
-    $("#courier-methods").innerHTML = COURIERS.map(
-      (c) => `<label>${c[1]}<br><select data-courier="${c[0]}">${METHODS.map((m) => opt(m[0], m[1])).join("")}</select></label>`
-    ).join("");
+    document.querySelectorAll("select.method").forEach((s) => (s.innerHTML = methodOpts()));
     $("#tools").innerHTML = TOOLS.map((t) => `<label><input type="checkbox" data-tool="${t[0]}"> ${t[1]}</label>`).join("");
 
     document.querySelectorAll("[data-key]").forEach((el) => {
@@ -112,15 +149,16 @@
         save();
       };
     });
-    document.querySelectorAll("[data-courier]").forEach((el) => {
-      el.value = S.courierMethods[el.dataset.courier];
-      el.onchange = () => ((S.courierMethods[el.dataset.courier] = el.value), save());
-    });
     document.querySelectorAll("[data-tool]").forEach((el) => {
       el.checked = S.tools[el.dataset.tool] !== false;
       el.onchange = () => ((S.tools[el.dataset.tool] = el.checked), save());
     });
     drawPaperwork();
+    drawCouriers();
+    $("#courier-add").onclick = () => {
+      S.couriers.push({ codes: "", method: "", name: "", big: "", bigName: "" });
+      drawCouriers();
+    };
     $("#paperwork-add").onclick = () => {
       S.paperwork.push({ name: "", paper: "slip" });
       drawPaperwork();
@@ -161,10 +199,20 @@
     );
   };
 
-  chrome.storage.local.get("nshSettings", (v) => {
+  chrome.storage.local.get(["nshSettings", "nshMethodList"], (v) => {
     const saved = v.nshSettings || {};
+    if (Array.isArray(v.nshMethodList) && v.nshMethodList.length) ALL_METHODS = v.nshMethodList.map((m) => [String(m.id), String(m.name)]);
     S = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), saved);
-    S.courierMethods = Object.assign({}, DEFAULTS.courierMethods, saved.courierMethods || {});
+    // Settings saved before the one list (0.30.0-0.30.2): carry their courier choices over.
+    if (!saved.couriers && (saved.courierMethods || saved.customCouriers)) {
+      const cm = saved.courierMethods || {};
+      const pick = (r, id, big) => Object.assign(r, id ? { method: String(id), name: methodName(id) || r.name } : {}, big ? { big: String(big), bigName: methodName(big) || r.bigName } : {});
+      const [chill, ste, stp, fw, pu] = S.couriers;
+      pick(chill, cm.CHILL); pick(ste, cm.STE); pick(stp, cm.STP); pick(fw, cm.FW_SMALL, cm.FW_BIG); pick(pu, cm.PICKUP);
+      (saved.customCouriers || []).forEach((c) => c && c.code && c.method && S.couriers.push({ codes: String(c.code).toUpperCase(), method: String(c.method), name: c.name || "", big: "", bigName: "" }));
+    }
+    delete S.courierMethods;
+    delete S.customCouriers;
     S.tools = Object.assign({}, DEFAULTS.tools, saved.tools || {});
     draw();
     loadPrinters();

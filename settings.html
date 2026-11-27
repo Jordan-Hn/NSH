@@ -6,18 +6,19 @@
 <style>
   body { margin: 0; background: #f0f0f0; font: 13px "Open Sans", Helvetica, Arial, sans-serif; color: #333; }
   header { background: #607799; color: #fff; padding: 14px 24px; font-size: 18px; font-weight: 600; }
-  main { max-width: 860px; margin: 18px auto 60px; padding: 0 16px; }
+  main { max-width: 980px; margin: 18px auto 60px; padding: 0 16px; }
   section { background: #fff; border-radius: 5px; box-shadow: 0 0 8px rgba(195, 195, 195, .5); margin-bottom: 16px; }
   h2 { margin: 0; background: #dfe4ec; font-size: 13px; font-weight: 700; padding: 7px 12px; border-radius: 5px 5px 0 0; }
   .rows { padding: 6px 14px 12px; }
   .row { display: flex; align-items: center; gap: 14px; padding: 8px 0; border-bottom: 1px solid #eee; }
   .row:last-child { border-bottom: 0; }
-  .row label.name { flex: 0 0 280px; font-weight: 600; }
+  .row label.name { flex: 0 0 260px; font-weight: 600; }
   .row .ctl { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   select, input[type=text], input[type=number] { font: inherit; padding: 3px 6px; border: 1px solid #b5b5b5; border-radius: 2px; background: #fff; }
   input[type=number] { width: 60px; }
   table.list { border-collapse: collapse; }
   table.list td { padding: 3px 6px 3px 0; }
+  table.list th { text-align: left; font-weight: 400; color: #666; padding: 0 6px 2px 0; }
   button { font: inherit; border: 1px solid #b5b5b5; background: #e9e9e9; border-radius: 3px; padding: 4px 10px; cursor: pointer; }
   button.primary { background: #1a6ff0; border-color: #1a6ff0; color: #fff; font-weight: 600; }
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 20px; }
@@ -42,8 +43,11 @@
       <div class="row"><label class="name" for="workers">Orders at once</label><div class="ctl"><select id="workers" data-key="workers" data-num="1"><option>1</option><option>2</option><option>3</option></select></div></div>
       <div class="row"><label class="name" for="autoRetry">Try a failed save again by itself</label><div class="ctl"><input type="checkbox" id="autoRetry" data-key="autoRetry"></div></div>
       <div class="row"><label class="name" for="shipAutoPrint">Send paperwork to AutoPrint</label><div class="ctl"><input type="checkbox" id="shipAutoPrint" data-key="shipAutoPrint"></div></div>
-      <div class="row"><label class="name">Method for each courier</label>
-        <div class="ctl grid2" id="courier-methods"></div></div>
+      <div class="row"><label class="name">Couriers</label>
+        <div class="ctl" style="display:block">
+          <table class="list" id="couriers"><thead><tr><th>Tracker code</th><th>Method</th><th>Over 3 cartons or pallets</th><th></th></tr></thead><tbody></tbody></table>
+          <button type="button" id="courier-add">Add courier</button>
+        </div></div>
     </div>
   </section>
 

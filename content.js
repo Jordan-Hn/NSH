@@ -45,6 +45,16 @@
   try {
     chrome.storage.local.get("nshSettings", (v) => applySettings(v && v.nshSettings));
     chrome.storage.onChanged.addListener((c, area) => area === "local" && c.nshSettings && applySettings(c.nshSettings.newValue));
+    // Ship Orders keeps NetSuite's active shipping methods in localStorage; the Settings
+    // page (which can't search NetSuite) offers them from this copy.
+    const copyMethods = () => {
+      try {
+        const list = JSON.parse(localStorage.getItem("nshShipMethodList") || "null");
+        if (Array.isArray(list) && list.length) chrome.storage.local.set({ nshMethodList: list });
+      } catch (e) {}
+    };
+    copyMethods();
+    setTimeout(copyMethods, 8000);
   } catch (e) {}
 
   // ---------- Enter in the Helper's paste boxes ----------

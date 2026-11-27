@@ -101,7 +101,44 @@
   });
 
   const STATES = ["VIC", "NSW", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
-  const COURIERS = { CHILL: "CHILL", STE: "STE", STP: "STP", FW: "FW", FREEWAY: "FW", PICKUP: "PICKUP", "PICK UP": "PICKUP", PU: "PICKUP" };
+  // Tracker COURIER codes -> shipping method, from Settings' Couriers list (27/11/2026).
+  // "big" = the method for more than 3 cartons or any pallets (Freeway). The order follows
+  // the rules of the courier its method belongs to (courierOfMethod: labels, Chill suburb
+  // check, pickup, sleeve code); a method of no known courier gets no courier rules (OTHER).
+  const DEFAULT_COURIERS = [
+    { codes: "CHILL", method: "58051", name: "Chill Refrigerated Transport - General" },
+    { codes: "STE", method: "66829", name: "StarTrack Road Express" },
+    { codes: "STP", method: "66831", name: "StarTrack Premium" },
+    { codes: "FW, FREEWAY", method: "74678", name: "Freeway Courier <25kg Standard", big: "74679", bigName: "Freeway 1/2 Tonne <500kg Standard" },
+    { codes: "PICKUP, PU, PICK UP", method: "28953", name: "Click & Collect" },
+  ];
+  // Settings saved by 0.30.0-0.30.2 (method per built-in courier + own couriers) until the
+  // Settings page is next opened, which turns them into the one list.
+  function oldCourierSettings() {
+    const cm = setting("courierMethods", null);
+    const own = setting("customCouriers", null);
+    if (!cm && !own) return null;
+    const list = DEFAULT_COURIERS.map((c) => Object.assign({}, c));
+    const keys = [["CHILL"], ["STE"], ["STP"], ["FW_SMALL", "FW_BIG"], ["PICKUP"]];
+    if (cm)
+      keys.forEach(([k, kb], i) => {
+        const find = (id) => Object.values(METHOD).find((m) => m.id === String(id));
+        if (cm[k] && find(cm[k])) Object.assign(list[i], { method: String(cm[k]), name: find(cm[k]).name });
+        if (kb && cm[kb] && find(cm[kb])) Object.assign(list[i], { big: String(cm[kb]), bigName: find(cm[kb]).name });
+      });
+    (own || []).forEach((c) => c && c.code && c.method && list.push({ codes: String(c.code), method: String(c.method), name: String(c.name || "") }));
+    return list;
+  }
+  const COURIERS = {};
+  (setting("couriers", null) || oldCourierSettings() || DEFAULT_COURIERS).forEach((c) => {
+    if (!c || !c.method) return;
+    const m = { id: String(c.method), name: String(c.name || "") };
+    const big = c.big ? { id: String(c.big), name: String(c.bigName || "") } : null;
+    String(c.codes || "").split(",").forEach((code) => {
+      const k = code.trim().toUpperCase();
+      if (k && !COURIERS[k]) COURIERS[k] = { method: m, big };
+    });
+  });
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   function esc(s) {
@@ -139,6 +176,7 @@
       // never billed, packing slip instead of an invoice.
       const isTO = /^TO/.test(so);
       const courierAt = isTO ? -1 : up.findIndex((c, i) => i > soAt && COURIERS[c]);
+      const cour = courierAt >= 0 ? COURIERS[up[courierAt]] : null;
       const multi = up.some((c) => /^MULTI[\s-]?DROP$/.test(c));
       const state = multi ? "MULTIDROP" : up.find((c) => STATES.includes(c)) || "";
       let ctn = 0;
@@ -173,7 +211,8 @@
         delivery,
         customer: (cells[soAt + (isTO ? 2 : 1)] || "").trim(),
         state,
-        courier: isTO ? "CHILL" : courierAt >= 0 ? COURIERS[up[courierAt]] : "",
+        courier: isTO ? "CHILL" : cour ? courierOfMethod(cour.method.name) : "",
+        courierMethods: isTO ? null : cour,
         connoteAt,
         connote: connoteAt >= 0 ? cells[connoteAt].trim() : "",
         dispatchedAt: up.findIndex((c, i) => i > soAt && (c === "NO" || c === "YES")),
@@ -192,14 +231,11 @@
   // Methods can be changed per courier in Settings (27/11/2026).
   const methodById = (id, fallback) => Object.values(METHOD).find((m) => m.id === String(id)) || fallback;
   function methodFor(row) {
-    const cm = setting("courierMethods", {}) || {};
     if (row.isTO) return methodById(setting("toMethod", METHOD.CHILL_EXPRESS.id), METHOD.CHILL_EXPRESS);
-    if (row.courier === "CHILL") return methodById(cm.CHILL, METHOD.CHILL);
-    if (row.courier === "STE") return methodById(cm.STE, METHOD.STE);
-    if (row.courier === "STP") return methodById(cm.STP, METHOD.STP);
-    if (row.courier === "FW") return row.ctn <= 3 ? methodById(cm.FW_SMALL, METHOD.FW_SMALL) : methodById(cm.FW_BIG, METHOD.FW_BIG);
-    if (row.courier === "PICKUP") return methodById(cm.PICKUP, METHOD.PICKUP);
-    return null;
+    const c = row.courierMethods;
+    if (!c) return null;
+    const m = c.big && (row.ctn > 3 || row.plt > 0) ? c.big : c.method;
+    return { id: m.id, name: m.name };
   }
 
   // Code for the back of the sleeve (SOP 2 part G / SOP 6).
@@ -415,7 +451,7 @@
       if ((row.courier === "STE" || row.courier === "STP") && row.plt) return out("flag", "StarTrack on a pallet: Ready Freight won't take it (22 kg limit), do it by hand");
       if (/^MYER/i.test(rec.customer) && (row.courier !== "CHILL" || !row.plt)) return out("flag", "Myer should be Chill and pallets");
       const fam = row.isTO ? "" : family(rec.shipVia);
-      if (fam && fam !== courierFamily(row.courier)) return out("flag", "Order's Ship Via is " + rec.shipVia + ", tracker says " + row.courier);
+      if (fam && row.courier !== "OTHER" && fam !== courierFamily(row.courier)) return out("flag", "Order's Ship Via is " + rec.shipVia + ", tracker says " + row.courier);
       // Several fulfilments where exactly one is from a warehouse and the rest are from
       // Warehouses : Online (two since 25/11/2026, any number since 27/11/2026): the Online
       // ones are just marked Shipped (Custom, no packages); the warehouse one gets the
@@ -1629,6 +1665,8 @@
         // NetSuite hands the names over HTML-escaped ("&lt;25kg"): undo that before showing them.
         name: String(r.getValue("itemid")).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&"),
       }));
+      // Kept for the Settings page's method boxes (content.js copies it across).
+      if (methodList.length) localStorage.setItem("nshShipMethodList", JSON.stringify(methodList));
     } catch (e) {
       methodList = [];
     }
@@ -2099,4 +2137,14 @@
   // For checking the suburb/postcode rules against the live Chill list (read-only).
   window.__nshChillCheck = (city, zip, state) => chillCheck(city, zip, state, chillFind);
   renderInput("");
+  // Read the shipping methods once a day for the Settings page's method boxes (one search).
+  try {
+    const old = JSON.parse(localStorage.getItem("nshShipMethodListAt") || "0");
+    if (Date.now() - old > 864e5)
+      setTimeout(() => {
+        try {
+          if (shipMethods().length) localStorage.setItem("nshShipMethodListAt", String(Date.now()));
+        } catch (e) {}
+      }, 4000);
+  } catch (e) {}
 })();
